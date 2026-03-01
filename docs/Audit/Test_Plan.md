@@ -122,3 +122,65 @@
 1. Right-click platform B with a non-empty main hand while crouching. Verify no toggle occurs.
 2. Right-click platform B with empty hand while NOT crouching. Verify no toggle occurs.
 3. Only Shift + empty hand + right-click should toggle.
+
+---
+
+## G001: DHD Packet Distance Check — FIXED
+
+### Setup
+1. Place a Milky Way DHD and a connected Stargate.
+2. Note the DHD's BlockPos.
+
+### Steps
+1. Open DHD GUI from normal range (within 8 blocks). Verify chevron engagement works.
+2. Using a packet-crafting tool, send `ServerboundDHDUpdatePacket` targeting the DHD's BlockPos with symbol 1 from 100+ blocks away.
+3. Observe: packet should be silently dropped.
+
+### Expected: Packet dropped at >8 blocks. Normal use within 8 blocks works.
+
+---
+
+## G002: Interface Packet Distance Check — FIXED
+
+### Setup
+1. Place a Basic Interface connected to a Stargate.
+2. Note its BlockPos.
+
+### Steps
+1. Open Interface GUI from normal range. Verify energy target and mode changes work.
+2. From 100+ blocks away, send crafted `ServerboundInterfaceUpdatePacket`.
+3. Observe: packet should be silently dropped.
+
+### Expected: Packet dropped at >8 blocks. Normal GUI use within 8 blocks works.
+
+---
+
+## G003: Transceiver Packet Distance Check — FIXED
+
+### Setup
+1. Place a Transceiver.
+2. Note its BlockPos.
+
+### Steps
+1. Open Transceiver GUI from normal range. Verify frequency input and transmission work.
+2. From 100+ blocks away, send crafted `ServerboundTransceiverUpdatePacket` with `transmit=true`.
+3. Observe: packet should be silently dropped.
+
+### Expected: Packet dropped at >8 blocks. Normal GUI use within 8 blocks works.
+
+---
+
+## G004: Stargate Chunk Force-Loading Release — FIXED
+
+### Setup
+1. Enable `stargate_loads_chunk_when_connected` in mod config.
+2. Place two Stargates (A and B) in different chunks, at least 100 blocks apart.
+
+### Steps
+1. Dial from A to B. Verify connection established and both chunks force-loaded.
+2. While connection is active, break Stargate B's base block.
+3. Run `/forceload query` at Stargate B's former position.
+4. Verify: chunk is NOT force-loaded.
+5. Rebuild Stargate B, repeat with breaking Stargate A instead.
+
+### Expected: Chunk force-loading is released on block destruction regardless of which gate is broken.

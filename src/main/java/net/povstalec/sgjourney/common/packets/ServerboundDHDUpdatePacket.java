@@ -12,28 +12,31 @@ import net.povstalec.sgjourney.common.block_entities.dhd.AbstractDHDEntity;
 
 public record ServerboundDHDUpdatePacket(BlockPos blockPos, int symbol) implements CustomPacketPayload
 {
-	public static final CustomPacketPayload.Type<ServerboundDHDUpdatePacket> TYPE =
-			new CustomPacketPayload.Type<>(StargateJourney.sgjourneyLocation("c2s_dhd_update"));
-	
-	public static final StreamCodec<ByteBuf, ServerboundDHDUpdatePacket> STREAM_CODEC = StreamCodec.composite(
-			BlockPos.STREAM_CODEC, ServerboundDHDUpdatePacket::blockPos,
-			ByteBufCodecs.VAR_INT, ServerboundDHDUpdatePacket::symbol,
-			ServerboundDHDUpdatePacket::new
-	);
-	
-	@Override
-	public CustomPacketPayload.Type<? extends CustomPacketPayload> type()
-	{
-		return TYPE;
-	}
-	
-	public static void handle(ServerboundDHDUpdatePacket packet, IPayloadContext ctx)
+        public static final CustomPacketPayload.Type<ServerboundDHDUpdatePacket> TYPE =
+                        new CustomPacketPayload.Type<>(StargateJourney.sgjourneyLocation("c2s_dhd_update"));
+        
+        public static final StreamCodec<ByteBuf, ServerboundDHDUpdatePacket> STREAM_CODEC = StreamCodec.composite(
+                        BlockPos.STREAM_CODEC, ServerboundDHDUpdatePacket::blockPos,
+                        ByteBufCodecs.VAR_INT, ServerboundDHDUpdatePacket::symbol,
+                        ServerboundDHDUpdatePacket::new
+        );
+        
+        @Override
+        public CustomPacketPayload.Type<? extends CustomPacketPayload> type()
+        {
+                return TYPE;
+        }
+        
+        public static void handle(ServerboundDHDUpdatePacket packet, IPayloadContext ctx)
     {
-    	ctx.enqueueWork(() -> {
-    		final BlockEntity blockEntity = ctx.player().level().getBlockEntity(packet.blockPos);
-    		if(blockEntity instanceof AbstractDHDEntity dhd)
-    			dhd.engageChevron(packet.symbol);
-    	});
+        ctx.enqueueWork(() -> {
+                if(ctx.player().distanceToSqr(packet.blockPos.getX() + 0.5, packet.blockPos.getY() + 0.5, packet.blockPos.getZ() + 0.5) > 64.0)
+                        return;
+
+                final BlockEntity blockEntity = ctx.player().level().getBlockEntity(packet.blockPos);
+                if(blockEntity instanceof AbstractDHDEntity dhd)
+                        dhd.engageChevron(packet.symbol);
+        });
     }
 }
 

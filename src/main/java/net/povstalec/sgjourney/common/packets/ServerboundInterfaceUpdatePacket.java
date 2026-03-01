@@ -17,36 +17,39 @@ import net.povstalec.sgjourney.common.blockstates.InterfaceMode;
 
 public record ServerboundInterfaceUpdatePacket(BlockPos pos, long energyTarget, InterfaceMode mode) implements CustomPacketPayload
 {
-	public static final CustomPacketPayload.Type<ServerboundInterfaceUpdatePacket> TYPE =
-			new CustomPacketPayload.Type<>(StargateJourney.sgjourneyLocation("c2s_interface_update"));
-	
-	public static final StreamCodec<FriendlyByteBuf, ServerboundInterfaceUpdatePacket> STREAM_CODEC = StreamCodec.composite(
-			BlockPos.STREAM_CODEC, ServerboundInterfaceUpdatePacket::pos,
-			ByteBufCodecs.VAR_LONG, ServerboundInterfaceUpdatePacket::energyTarget,
-			NeoForgeStreamCodecs.enumCodec(InterfaceMode.class), ServerboundInterfaceUpdatePacket::mode,
-			ServerboundInterfaceUpdatePacket::new
-	);
-	
-	@Override
-	public CustomPacketPayload.Type<? extends CustomPacketPayload> type()
-	{
-		return TYPE;
-	}
-	
-	public static void handle(ServerboundInterfaceUpdatePacket packet, IPayloadContext ctx)
-	{
-		ctx.enqueueWork(() -> {
-			Level level = ctx.player().level();
-			final BlockEntity blockEntity = level.getBlockEntity(packet.pos);
-			
-			if(blockEntity instanceof AbstractInterfaceEntity interfaceEntity)
-				interfaceEntity.setEnergyTarget(packet.energyTarget);
-			
-			BlockState state = level.getBlockState(packet.pos);
-			if(level.getBlockState(packet.pos).getBlock() instanceof AbstractInterfaceBlock interfaceBlock)
-				interfaceBlock.setMode(state, level, packet.pos, packet.mode);
-		});
-	}
+        public static final CustomPacketPayload.Type<ServerboundInterfaceUpdatePacket> TYPE =
+                        new CustomPacketPayload.Type<>(StargateJourney.sgjourneyLocation("c2s_interface_update"));
+        
+        public static final StreamCodec<FriendlyByteBuf, ServerboundInterfaceUpdatePacket> STREAM_CODEC = StreamCodec.composite(
+                        BlockPos.STREAM_CODEC, ServerboundInterfaceUpdatePacket::pos,
+                        ByteBufCodecs.VAR_LONG, ServerboundInterfaceUpdatePacket::energyTarget,
+                        NeoForgeStreamCodecs.enumCodec(InterfaceMode.class), ServerboundInterfaceUpdatePacket::mode,
+                        ServerboundInterfaceUpdatePacket::new
+        );
+        
+        @Override
+        public CustomPacketPayload.Type<? extends CustomPacketPayload> type()
+        {
+                return TYPE;
+        }
+        
+        public static void handle(ServerboundInterfaceUpdatePacket packet, IPayloadContext ctx)
+        {
+                ctx.enqueueWork(() -> {
+                        if(ctx.player().distanceToSqr(packet.pos.getX() + 0.5, packet.pos.getY() + 0.5, packet.pos.getZ() + 0.5) > 64.0)
+                                return;
+
+                        Level level = ctx.player().level();
+                        final BlockEntity blockEntity = level.getBlockEntity(packet.pos);
+                        
+                        if(blockEntity instanceof AbstractInterfaceEntity interfaceEntity)
+                                interfaceEntity.setEnergyTarget(packet.energyTarget);
+                        
+                        BlockState state = level.getBlockState(packet.pos);
+                        if(level.getBlockState(packet.pos).getBlock() instanceof AbstractInterfaceBlock interfaceBlock)
+                                interfaceBlock.setMode(state, level, packet.pos, packet.mode);
+                });
+        }
 }
 
 

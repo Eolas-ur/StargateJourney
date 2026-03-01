@@ -42,25 +42,25 @@ Severity follows the rubric in `Rubric.md`:
 
 ## Top 10 Recommended Fixes (by Severity / ROI)
 
-| Priority | ID | Title | Severity | Effort |
+| Priority | ID | Title | Severity | Status |
 |---|---|---|---|---|
-| 1 | G001 | Add distance check to DHD packet | High | 2 lines |
-| 2 | G002 | Add distance check to Interface packet | High | 2 lines |
-| 3 | G003 | Add distance check to Transceiver packet | High | 2 lines |
-| 4 | G004 | Defensive chunk unforce on stargate destruction | High | ~5 lines |
-| 5 | G010 | Dirty-flag `updateClient()` in tech BEs | Medium | ~20 lines |
-| 6 | P001 | Log warning on StargateNetwork version migration | Medium | 1 line |
-| 7 | P003 | Clean orphaned UUID entries in BlockEntityList | Medium | ~5 lines |
-| 8 | G008 | Cap GDO/Transceiver transmission scan radius | Medium | ~3 lines |
-| 9 | G012 | Defer cable BFS to end-of-tick | Medium | ~15 lines |
-| 10 | F004 | Guard `handleConnections()` with `isEmpty()` | Medium | 1 line |
+| 1 | G001 | Distance check on DHD packet | High | **FIXED** |
+| 2 | G002 | Distance check on Interface packet | High | **FIXED** |
+| 3 | G003 | Distance check on Transceiver packet | High | **FIXED** |
+| 4 | G004 | Defensive chunk unforce on stargate destruction | High | **FIXED** |
+| 5 | G010 | Dirty-flag `updateClient()` in tech BEs | Medium | Open |
+| 6 | P001 | Log warning on StargateNetwork version migration | Medium | Open |
+| 7 | P003 | Clean orphaned UUID entries in BlockEntityList | Medium | Open |
+| 8 | G008 | Cap GDO/Transceiver transmission scan radius | Medium | Open |
+| 9 | G012 | Defer cable BFS to end-of-tick | Medium | Open |
+| 10 | F004 | Guard `handleConnections()` with `isEmpty()` | Medium | Open |
 
 ## Statistics
 
 - **Objects audited:** ~60 blocks, ~50 items, ~25 block entities, 13 menus, 5 serverbound packets, 7 SavedData classes
 - **Findings:** 31 total (across F/G/P series)
   - Critical: 0
-  - High: 4 (G001–G004; F001 and F002 already fixed)
+  - High: 4 — **all fixed** (G001–G004; plus F001 and F002 from earlier sprint)
   - Medium: 10
   - Low: 11
   - Positive/Informational: 6

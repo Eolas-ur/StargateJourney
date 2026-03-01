@@ -9,10 +9,10 @@ Global audit of all serverbound packets against the rubric.
 | Packet | Distance Check | BE Type Check | Dimension Check | Safe Drop | Spam Potential |
 |--------|:-:|:-:|:-:|:-:|:-:|
 | `ServerboundRingPanelUpdatePacket` | **Yes** (fixed in F001) | Yes (`RingPanelEntity`) | Implicit (same level) | Yes | Low |
-| `ServerboundDHDUpdatePacket` | **No** (G001) | Yes (`AbstractDHDEntity`) | Implicit | Yes | Medium |
-| `ServerboundInterfaceUpdatePacket` | **No** (G002) | Yes (`AbstractInterfaceEntity` + `AbstractInterfaceBlock`) | Implicit | Yes | Low |
+| `ServerboundDHDUpdatePacket` | **Yes** (fixed in G001) | Yes (`AbstractDHDEntity`) | Implicit | Yes | Medium |
+| `ServerboundInterfaceUpdatePacket` | **Yes** (fixed in G002) | Yes (`AbstractInterfaceEntity` + `AbstractInterfaceBlock`) | Implicit | Yes | Low |
 | `ServerboundGDOUpdatePacket` | N/A (item-based) | Yes (`GDOItem` in hand) | N/A | Yes | Low |
-| `ServerboundTransceiverUpdatePacket` | **No** (G003) | Yes (`TransceiverEntity`) | Implicit | Yes | Medium |
+| `ServerboundTransceiverUpdatePacket` | **Yes** (fixed in G003) | Yes (`TransceiverEntity`) | Implicit | Yes | Medium |
 
 ---
 
@@ -27,22 +27,22 @@ Global audit of all serverbound packets against the rubric.
 
 ---
 
-### ServerboundDHDUpdatePacket — NO DISTANCE CHECK (G001)
+### ServerboundDHDUpdatePacket — FIXED (G001)
 
-- **Distance:** None. Any client can engage chevrons on any DHD in any loaded chunk.
-- **BE Type:** `instanceof AbstractDHDEntity` — prevents crash but not remote activation.
-- **Safe Drop:** Yes — returns silently if BE is not a DHD.
-- **Spam Potential:** Medium. Each press engages one chevron with energy cost. Rapid presses could drain DHD energy or trigger multiple connection attempts. Server-side energy validation in `engageChevron()` provides some natural rate limiting.
+- **Distance:** ≤ 64.0 squared (8 blocks). Check added before `getBlockEntity()`.
+- **BE Type:** `instanceof AbstractDHDEntity` — prevents crash and validates target type.
+- **Safe Drop:** Returns silently if distance or type check fails.
+- **Spam Potential:** Medium. Each press engages one chevron with energy cost. Server-side energy validation in `engageChevron()` provides natural rate limiting.
 - **Cross-reference:** See G001 in Findings_Gameplay.md.
 
 ---
 
-### ServerboundInterfaceUpdatePacket — NO DISTANCE CHECK (G002)
+### ServerboundInterfaceUpdatePacket — FIXED (G002)
 
-- **Distance:** None. Any client can modify any Interface block's energy target and mode remotely.
+- **Distance:** ≤ 64.0 squared (8 blocks). Check added before any level access.
 - **BE Type:** Dual check — `instanceof AbstractInterfaceEntity` AND `instanceof AbstractInterfaceBlock`.
-- **Safe Drop:** Yes.
-- **Spam Potential:** Low. Setting energy target and mode are idempotent operations. No amplification risk.
+- **Safe Drop:** Returns silently if distance check fails.
+- **Spam Potential:** Low. Setting energy target and mode are idempotent operations.
 - **Cross-reference:** See G002 in Findings_Gameplay.md.
 
 ---
@@ -58,12 +58,12 @@ Global audit of all serverbound packets against the rubric.
 
 ---
 
-### ServerboundTransceiverUpdatePacket — NO DISTANCE CHECK (G003)
+### ServerboundTransceiverUpdatePacket — FIXED (G003)
 
-- **Distance:** None. Any client can manipulate any Transceiver's frequency, IDC, and trigger transmissions remotely.
+- **Distance:** ≤ 64.0 squared (8 blocks). Check added before `getBlockEntity()`.
 - **BE Type:** `instanceof TransceiverEntity`.
-- **Safe Drop:** Yes.
-- **Spam Potential:** Medium. `sendTransmission()` scans loaded chunks within transmission radius. Rapid sends could cause repeated chunk scans. However, the handler is idempotent for code/frequency changes.
+- **Safe Drop:** Returns silently if distance check fails.
+- **Spam Potential:** Medium. `sendTransmission()` scans loaded chunks within transmission radius. Distance check prevents remote spam.
 - **Cross-reference:** See G003 in Findings_Gameplay.md.
 
 ---
@@ -84,10 +84,11 @@ No security issues identified in clientbound packets.
 
 ## Recommendations
 
-1. **Add distance checks to G001, G002, G003** — All three follow the same pattern as the already-fixed F001. A shared utility method could be used:
+1. ~~**Add distance checks to G001, G002, G003**~~ — **Done.** All three now have the same distance check pattern as the F001 ring panel fix.
+2. **Consider rate limiting for Transceiver transmissions** — Each transmission scans loaded chunks. A server-side cooldown (e.g., 20 ticks between transmissions) would prevent spam. Distance check now prevents remote triggering but local spam is still possible.
+3. **Consider extracting a shared utility method** for the distance check pattern used across all 4 serverbound packet handlers:
    ```java
    public static boolean isPlayerInRange(IPayloadContext ctx, BlockPos pos) {
        return ctx.player().distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64.0;
    }
    ```
-2. **Consider rate limiting for Transceiver transmissions** — Each transmission scans loaded chunks. A server-side cooldown (e.g., 20 ticks between transmissions) would prevent spam.

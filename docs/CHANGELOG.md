@@ -1,5 +1,28 @@
 # Documentation Changelog
 
+## 2026-03-01 (Update 5)
+
+### Security Hardening: All High-Severity Findings Fixed
+
+All 4 High-severity gameplay findings (G001–G004) are now fixed in code and documented.
+
+**Code changes:**
+- `ServerboundDHDUpdatePacket.handle()` — Added distance check (64.0 sq / 8 blocks) before any world access (G001)
+- `ServerboundInterfaceUpdatePacket.handle()` — Added distance check before level/BE access (G002)
+- `ServerboundTransceiverUpdatePacket.handle()` — Added distance check before `getBlockEntity()` (G003)
+- `AbstractStargateEntity.resetStargate()` — Added defensive `setChunkForced(false)` guarded by `FORCE_LOAD_CHUNK && connectionID != null` (G004)
+
+**Documentation updates:**
+- `Findings_Gameplay.md` — G001–G004 marked FIXED with fix details and code snippets
+- `Findings_Packets.md` — Summary table updated (all packets now have distance checks), detailed sections updated to FIXED status, recommendations updated
+- `Test_Plan.md` — Added test entries for G001–G004
+- `README.md` — Top 10 table updated with FIXED status; statistics updated
+- `replit.md` — Added security hardening summary
+
+**Build:** Successful. Only pre-existing deprecation warnings (10× `@EventBusSubscriber` deprecation).
+
+---
+
 ## 2026-03-01 (Update 4)
 
 ### Full Gameplay Surface Audit
@@ -20,7 +43,7 @@ Comprehensive audit of all registered blocks, items, block entities, menus, pack
 - G003: Transceiver packet has no distance check
 - G004: Stargate chunk force-loading has same vulnerability as fixed F002
 
-**Statistics:** 31 total findings across F/G/P series. 0 Critical, 4 High (unfixed), 10 Medium, 11 Low.
+**Statistics:** 31 total findings across F/G/P series. 0 Critical, 4 High (now all fixed), 10 Medium, 11 Low.
 
 ---
 

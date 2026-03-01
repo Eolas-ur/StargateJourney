@@ -12,41 +12,44 @@ import net.povstalec.sgjourney.StargateJourney;
 
 public record ServerboundTransceiverUpdatePacket(BlockPos blockPos, boolean remove, boolean toggleFrequency, int number, boolean transmit) implements CustomPacketPayload
 {
-	public static final CustomPacketPayload.Type<ServerboundTransceiverUpdatePacket> TYPE =
-			new CustomPacketPayload.Type<>(StargateJourney.sgjourneyLocation("c2s_transceiver_update"));
-	
-	public static final StreamCodec<ByteBuf, ServerboundTransceiverUpdatePacket> STREAM_CODEC = StreamCodec.composite(
-			BlockPos.STREAM_CODEC, ServerboundTransceiverUpdatePacket::blockPos,
-			ByteBufCodecs.BOOL, ServerboundTransceiverUpdatePacket::remove,
-			ByteBufCodecs.BOOL, ServerboundTransceiverUpdatePacket::toggleFrequency,
-			ByteBufCodecs.VAR_INT, ServerboundTransceiverUpdatePacket::number,
-			ByteBufCodecs.BOOL, ServerboundTransceiverUpdatePacket::transmit,
-			ServerboundTransceiverUpdatePacket::new
-	);
-	
-	@Override
-	public CustomPacketPayload.Type<? extends CustomPacketPayload> type()
-	{
-		return TYPE;
-	}
-	
-	public static void handle(ServerboundTransceiverUpdatePacket packet, IPayloadContext ctx)
+        public static final CustomPacketPayload.Type<ServerboundTransceiverUpdatePacket> TYPE =
+                        new CustomPacketPayload.Type<>(StargateJourney.sgjourneyLocation("c2s_transceiver_update"));
+        
+        public static final StreamCodec<ByteBuf, ServerboundTransceiverUpdatePacket> STREAM_CODEC = StreamCodec.composite(
+                        BlockPos.STREAM_CODEC, ServerboundTransceiverUpdatePacket::blockPos,
+                        ByteBufCodecs.BOOL, ServerboundTransceiverUpdatePacket::remove,
+                        ByteBufCodecs.BOOL, ServerboundTransceiverUpdatePacket::toggleFrequency,
+                        ByteBufCodecs.VAR_INT, ServerboundTransceiverUpdatePacket::number,
+                        ByteBufCodecs.BOOL, ServerboundTransceiverUpdatePacket::transmit,
+                        ServerboundTransceiverUpdatePacket::new
+        );
+        
+        @Override
+        public CustomPacketPayload.Type<? extends CustomPacketPayload> type()
+        {
+                return TYPE;
+        }
+        
+        public static void handle(ServerboundTransceiverUpdatePacket packet, IPayloadContext ctx)
     {
-    	ctx.enqueueWork(() -> {
-    		final BlockEntity blockEntity = ctx.player().level().getBlockEntity(packet.blockPos);
-    		
-    		if(blockEntity instanceof TransceiverEntity transceiver)
-    		{
-    			if(packet.transmit)
-    				transceiver.sendTransmission();
-    			else if(packet.toggleFrequency)
-    				transceiver.toggleFrequency();
-    			else if(packet.remove)
-    				transceiver.removeFromCode();
-    			else
-    				transceiver.addToCode(packet.number);
-    		}
-    	});
+        ctx.enqueueWork(() -> {
+                if(ctx.player().distanceToSqr(packet.blockPos.getX() + 0.5, packet.blockPos.getY() + 0.5, packet.blockPos.getZ() + 0.5) > 64.0)
+                        return;
+
+                final BlockEntity blockEntity = ctx.player().level().getBlockEntity(packet.blockPos);
+                
+                if(blockEntity instanceof TransceiverEntity transceiver)
+                {
+                        if(packet.transmit)
+                                transceiver.sendTransmission();
+                        else if(packet.toggleFrequency)
+                                transceiver.toggleFrequency();
+                        else if(packet.remove)
+                                transceiver.removeFromCode();
+                        else
+                                transceiver.addToCode(packet.number);
+                }
+        });
     }
 }
 

@@ -4,72 +4,70 @@ Findings from auditing all blocks, items, tools, weapons, interfaces, and integr
 
 ---
 
-## G001: No Distance Check on DHD Packet
+## G001: No Distance Check on DHD Packet — FIXED
 
 - **Severity:** High
+- **Status:** Fixed
 - **Affected:** `sgjourney:milky_way_dhd`, `sgjourney:pegasus_dhd`, `sgjourney:classic_dhd` — `ServerboundDHDUpdatePacket`
 - **Impact:** A malicious client can send a `ServerboundDHDUpdatePacket` with any `BlockPos` in the world. If a DHD exists at that position in a loaded chunk, it will engage a chevron. This allows remote stargate dialing from unlimited distance.
 - **Evidence:** `ServerboundDHDUpdatePacket.handle()` — looks up `ctx.player().level().getBlockEntity(packet.blockPos)` with no distance check. Only validates `instanceof AbstractDHDEntity`.
-- **Repro:**
-  1. Place a DHD and note its coordinates.
-  2. Move 1000+ blocks away.
-  3. Send a crafted `ServerboundDHDUpdatePacket` with the DHD's BlockPos and symbol 1.
-  4. Observe: chevron engages despite distance.
-- **Suggested Fix:** Add `ctx.player().distanceToSqr(...) > 64.0` check before `getBlockEntity()`, matching the F001 ring panel fix.
-- **Verify:** Repeat repro; packet is silently dropped.
+- **Fix Applied:** Added squared-distance check at the top of `ServerboundDHDUpdatePacket.handle()`:
+  ```java
+  if(ctx.player().distanceToSqr(packet.blockPos.getX() + 0.5, packet.blockPos.getY() + 0.5, packet.blockPos.getZ() + 0.5) > 64.0)
+      return;
+  ```
+  Threshold: **64.0** (8 blocks squared). Check runs before any `getBlockEntity()` call.
+- **Verify:** Send crafted packet from 100+ blocks away; silently dropped. Normal DHD use within 8 blocks works.
 
 ---
 
-## G002: No Distance Check on Interface Packet
+## G002: No Distance Check on Interface Packet — FIXED
 
 - **Severity:** High
+- **Status:** Fixed
 - **Affected:** `sgjourney:basic_interface`, `sgjourney:crystal_interface`, `sgjourney:advanced_crystal_interface` — `ServerboundInterfaceUpdatePacket`
 - **Impact:** A malicious client can modify any Interface block's energy target and mode from unlimited distance, potentially disrupting stargate operations or energy flow.
 - **Evidence:** `ServerboundInterfaceUpdatePacket.handle()` — looks up block entity and block with no distance check.
-- **Repro:**
-  1. Place an Interface and note coordinates.
-  2. Move 1000+ blocks away.
-  3. Send crafted packet setting `energyTarget` to 0 or changing mode.
-  4. Observe: Interface state changes remotely.
-- **Suggested Fix:** Add squared-distance check (≤ 64.0) at handler top.
-- **Verify:** Repeat repro; packet dropped.
+- **Fix Applied:** Added squared-distance check at the top of `ServerboundInterfaceUpdatePacket.handle()`:
+  ```java
+  if(ctx.player().distanceToSqr(packet.pos.getX() + 0.5, packet.pos.getY() + 0.5, packet.pos.getZ() + 0.5) > 64.0)
+      return;
+  ```
+  Threshold: **64.0** (8 blocks squared). Check runs before any level/BE access.
+- **Verify:** Send crafted packet from 100+ blocks away; silently dropped. Normal Interface GUI within 8 blocks works.
 
 ---
 
-## G003: No Distance Check on Transceiver Packet
+## G003: No Distance Check on Transceiver Packet — FIXED
 
 - **Severity:** High
+- **Status:** Fixed
 - **Affected:** `sgjourney:transceiver` — `ServerboundTransceiverUpdatePacket`
 - **Impact:** A malicious client can manipulate any Transceiver's frequency, IDC, and trigger transmissions from unlimited distance.
 - **Evidence:** `ServerboundTransceiverUpdatePacket.handle()` — no distance check before `getBlockEntity()`.
-- **Repro:**
-  1. Place a Transceiver and note coordinates.
-  2. Move 1000+ blocks away.
-  3. Send crafted packet with `transmit=true`.
-  4. Observe: Transceiver transmits remotely.
-- **Suggested Fix:** Add squared-distance check (≤ 64.0) at handler top.
-- **Verify:** Repeat repro; packet dropped.
+- **Fix Applied:** Added squared-distance check at the top of `ServerboundTransceiverUpdatePacket.handle()`:
+  ```java
+  if(ctx.player().distanceToSqr(packet.blockPos.getX() + 0.5, packet.blockPos.getY() + 0.5, packet.blockPos.getZ() + 0.5) > 64.0)
+      return;
+  ```
+  Threshold: **64.0** (8 blocks squared). Check runs before any `getBlockEntity()` call.
+- **Verify:** Send crafted packet from 100+ blocks away; silently dropped. Normal Transceiver GUI within 8 blocks works.
 
 ---
 
-## G004: Stargate Chunk Force-Loading Not Released On Block Destruction
+## G004: Stargate Chunk Force-Loading Not Released On Block Destruction — FIXED
 
 - **Severity:** High
+- **Status:** Fixed
 - **Affected:** All stargate types — `AbstractStargateEntity`
 - **Impact:** If a stargate block is destroyed while a connection is active and `stargate_loads_chunk_when_connected` is true, the chunk may remain force-loaded permanently. The `onRemove` path calls `bypassDisconnectStargate()` → `StargateNetwork.terminateConnection()` → `StargateConnection.terminate()` → `stargate.resetStargate(server, ...)`. But `resetStargate` on the `Stargate` data object calls `getStargateEntity(server)` which may return null if the block entity is already removed, meaning `setConnected(State.IDLE)` (which calls `setChunkForced(false)`) is never reached.
 - **Evidence:**
-  - `AbstractStargateEntity.setConnected()` (line 1134–1146) — only unforces chunk when transitioning to IDLE.
+  - `AbstractStargateEntity.setConnected()` (line 1140–1152) — only unforces chunk when transitioning to IDLE.
   - `AbstractStargateBaseBlock.onRemove()` (line 200–216) — calls `bypassDisconnectStargate()` but the terminate path goes through data objects that null-guard `getStargateEntity()`.
   - `StargateConnection.terminate()` (line 245–262) — calls `resetStargate(server, ...)` on `Stargate` data objects.
   - Same pattern as F002 (Transport Rings), already fixed for transporters.
-- **Repro:**
-  1. Enable `stargate_loads_chunk_when_connected` in config.
-  2. Establish a stargate connection.
-  3. During the connection, break the dialed stargate's base block.
-  4. Run `/forceload query` at the destroyed stargate's position.
-  5. Observe: chunk may remain forced.
-- **Suggested Fix:** Add defensive `setChunkForced(false)` in `AbstractStargateEntity.resetStargate()` or in `AbstractStargateBaseBlock.onRemove()`, guarded by `connectionID != null && level != null && FORCE_LOAD_CHUNK`. Same pattern as the F002 fix for transporters.
-- **Verify:** Repeat repro; `/forceload query` shows no forced chunks.
+- **Fix Applied:** Added defensive `setChunkForced(false)` at the top of `AbstractStargateEntity.resetStargate()`, guarded by `FORCE_LOAD_CHUNK && connectionID != null && level != null && !level.isClientSide()`. Runs before `connectionID` is cleared and before `setConnected(IDLE)`, guaranteeing chunk release regardless of how `resetStargate` was reached. Redundant unforce from `setConnected(IDLE)` is idempotent.
+- **Verify:** Enable chunk loading config. Establish connection. Break a stargate during connection. Run `/forceload query` — chunk is released.
 
 ---
 
