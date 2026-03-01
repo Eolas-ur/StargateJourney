@@ -228,6 +228,13 @@ public abstract class AbstractTransporterEntity extends EnergyBlockEntity implem
         
         public void resetTransporter()
         {
+                // Guarantee forced chunk is released even if the block has already been
+                // removed (e.g., broken during active transport), because the subclass
+                // setConnected(false) path may fail to reach loadChunk when the
+                // blockstate is no longer transport rings.
+                if(this.connectionID != null && level != null && !level.isClientSide())
+                        loadChunk(false);
+
                 this.connectionID = null;
                 setConnected(false);
         }

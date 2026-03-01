@@ -1,6 +1,6 @@
 # Audit Test Plan
 
-## F001: Ring Panel Packet Distance Check
+## F001: Ring Panel Packet Distance Check — FIXED
 
 ### Setup
 1. Place Transport Rings (A) and Ring Panel near A.
@@ -11,12 +11,15 @@
 2. Using a mod or packet-crafting tool, send `ServerboundRingPanelUpdatePacket` targeting the Ring Panel's BlockPos from 100+ blocks away.
 3. Observe whether transport activates.
 
-### Expected (Current): Transport activates regardless of distance.
-### Expected (Fixed): Packet is silently dropped; no transport occurs.
+### Expected: Packet is silently dropped when player is >8 blocks from the Ring Panel. Normal usage within 8 blocks works.
+
+### Verification Notes
+- Threshold: 64.0 squared distance (8 blocks). Matches vanilla `Player.MAX_INTERACTION_DISTANCE`.
+- Check applied in `ServerboundRingPanelUpdatePacket.handle()` before `getBlockEntity()` lookup, so no world access occurs for out-of-range packets.
 
 ---
 
-## F002: Chunk Force-Loading on Block Destruction
+## F002: Chunk Force-Loading on Block Destruction — FIXED
 
 ### Setup
 1. Place Transport Rings (A) and Transport Rings (B) at least 100 blocks apart (different chunks).
@@ -25,11 +28,14 @@
 ### Steps
 1. Initiate transport from A to B via Ring Panel.
 2. During the ring animation (within the ~46-tick window), break Ring B with a pickaxe.
-3. Wait for the connection to naturally terminate.
-4. Run `/forceload query` in B's chunk.
+3. Run `/forceload query` in B's chunk immediately after breaking.
 
-### Expected (Current): B's chunk may remain force-loaded permanently.
-### Expected (Fixed): B's chunk is released when the block is broken.
+### Expected: B's chunk is released when the block is broken. `/forceload query` shows no forced chunks at that position.
+
+### Verification Notes
+- Fix location: `AbstractTransporterEntity.resetTransporter()` — calls `loadChunk(false)` when `connectionID != null` before clearing state.
+- Null safety: guarded by `level != null && !level.isClientSide()` to prevent NPE during teardown.
+- Idempotent: `setChunkForced(x, z, false)` on an already-unforced chunk is a no-op, so the redundant call from `setConnected(false)` is harmless.
 
 ---
 

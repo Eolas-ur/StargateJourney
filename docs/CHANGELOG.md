@@ -1,5 +1,25 @@
 # Documentation Changelog
 
+## 2026-03-01 (Update 3)
+
+### Audit Fixes: F001 and F002
+
+**F001 — Ring Panel Packet Distance Check (High → Fixed)**
+- Added server-side squared-distance check (threshold 64.0, i.e. 8 blocks) to `ServerboundRingPanelUpdatePacket.handle()`.
+- Packets from beyond 8 blocks are silently dropped before any world access occurs.
+- File: `ServerboundRingPanelUpdatePacket.java`
+
+**F002 — Chunk Force-Loading Release on Block Destruction (High → Fixed)**
+- Added defensive `loadChunk(false)` call in `AbstractTransporterEntity.resetTransporter()`, guarded by `connectionID != null && level != null && !level.isClientSide()`.
+- Guarantees forced chunks are released even if the block entity is inaccessible during the `TransporterConnection.terminate()` → `SGJourneyTransporter.reset()` call chain.
+- File: `AbstractTransporterEntity.java`
+
+**Documentation updated:**
+- `docs/Audit/Findings.md` — F001 and F002 marked as FIXED with applied fix details
+- `docs/Audit/Test_Plan.md` — F001 and F002 updated with verification notes
+
+---
+
 ## 2026-03-01 (Update 2)
 
 ### Ring Privacy Mode

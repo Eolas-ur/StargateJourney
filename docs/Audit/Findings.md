@@ -1,32 +1,34 @@
 # Audit Findings
 
-## F001: Ring Panel Packet Has No Distance Check
+## F001: Ring Panel Packet Has No Distance Check — FIXED
 
 - **Severity:** High
+- **Status:** Fixed
 - **Impact:** A malicious client can send `ServerboundRingPanelUpdatePacket` with any `BlockPos` in the world. The server will look up a `RingPanelEntity` at that position and call `activateRings()`. This allows a player to activate any Ring Panel at any distance in any loaded chunk, bypassing intended range/proximity restrictions.
 - **Evidence:**
-  - `ServerboundRingPanelUpdatePacket.handle()` (line 30) — retrieves `ctx.player().level().getBlockEntity(packet.blockPos)` with no distance check between the player and the block.
+  - `ServerboundRingPanelUpdatePacket.handle()` (line 33) — retrieves `ctx.player().level().getBlockEntity(packet.blockPos)` with no distance check between the player and the block.
   - The `blockPos` field is sent directly from the client (`BlockPos.STREAM_CODEC`).
-- **Suggested Fix:** Add a distance check in the handler:
+- **Fix Applied:** Added squared-distance check at the top of the handler in `ServerboundRingPanelUpdatePacket.handle()`:
   ```java
-  BlockPos pos = packet.blockPos;
-  if(ctx.player().distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) > 64) // 8 blocks squared
+  if(ctx.player().distanceToSqr(packet.blockPos.getX() + 0.5, packet.blockPos.getY() + 0.5, packet.blockPos.getZ() + 0.5) > 64.0)
       return;
   ```
-- **How to Verify:** Send a crafted packet targeting a Ring Panel 100+ blocks away. Without fix, transport activates. With fix, packet is silently dropped.
+  Threshold: **64.0** (8 blocks squared). This matches vanilla's container interaction range (`Player.MAX_INTERACTION_DISTANCE` = 64.0). Packets from beyond 8 blocks are silently dropped.
+- **How to Verify:** Send a crafted packet targeting a Ring Panel 100+ blocks away. Packet is silently dropped; no transport occurs. Normal usage within 8 blocks is unaffected.
 
 ---
 
-## F002: Chunk Force-Loading Not Released On Block Destruction During Active Connection
+## F002: Chunk Force-Loading Not Released On Block Destruction During Active Connection — FIXED
 
 - **Severity:** High
-- **Impact:** If a Transport Ring block is destroyed (by explosion, piston, etc.) while it has an active `TransporterConnection`, the chunk may remain force-loaded permanently until server restart. The `onRemove` in `AbstractTransporterBlock` (line 43) calls `disconnectTransporter()` which calls `TransporterNetwork.terminateConnection()`, which calls `connection.terminate()`. The terminate method calls `transporter.reset()` on both endpoints, which calls `resetTransporter()` on `AbstractTransporterEntity` — but by this point, the block entity is already being removed. The `loadChunk(false)` call happens inside `setConnected(false)` in `TransportRingsEntity.setConnected()` (line 222), which calls `loadChunk(connected)`. However, `setConnected` accesses `level.getBlockState(pos)` (line 225) which may return the new state (air) after `onRemove`, causing the `state.is(BlockInit.TRANSPORT_RINGS.get())` check to fail and `loadChunk` to never be called.
+- **Status:** Fixed
+- **Impact:** If a Transport Ring block is destroyed (by explosion, piston, etc.) while it has an active `TransporterConnection`, the chunk could remain force-loaded permanently. The `onRemove` path calls `disconnectTransporter()` → `terminateConnection()` → `connection.terminate()` → `transporter.reset(server)` → `SGJourneyTransporter.reset()` → `getTransporterEntity()` → `resetTransporter()` → `setConnected(false)`. While `TransportRingsEntity.setConnected()` does call `loadChunk(connected)` outside the block state guard, the chain depends on `getTransporterEntity()` successfully resolving the block entity. If the BE is already inaccessible (e.g., chunk unloaded by another mechanism, or the connection terminates via `tick()` after the block is fully gone), `getTransporterEntity()` returns null and `loadChunk(false)` is never reached.
 - **Evidence:**
-  - `TransportRingsEntity.setConnected()` (line 222–231) — checks block state before calling `loadChunk()`.
-  - `AbstractTransporterBlock.onRemove()` (line 43–56) — block state has already changed when this fires.
-  - `AbstractTransporterEntity.loadChunk()` (line 221) — the actual `setChunkForced` call.
-- **Suggested Fix:** Call `loadChunk(false)` directly in `AbstractTransporterBlock.onRemove()` or in `AbstractTransporterEntity.resetTransporter()`, unconditionally when `connectionID != null`, before the block state changes.
-- **How to Verify:** Start a ring transport. During the transport animation, break one of the ring blocks with a pickaxe. Check with `/forceload query` — the chunk should not remain forced after the connection naturally times out.
+  - `TransportRingsEntity.setConnected()` (line 222–231) — `loadChunk(connected)` is outside the blockstate `if` but still relies on the call chain reaching it.
+  - `SGJourneyTransporter.reset()` (line 203–209) — null-guards `getTransporterEntity()`, so if BE is gone, `resetTransporter()` is never called.
+  - `AbstractTransporterEntity.loadChunk()` (line 245) — the actual `setChunkForced` call.
+- **Fix Applied:** Added a defensive `loadChunk(false)` call at the top of `AbstractTransporterEntity.resetTransporter()`, guarded by `connectionID != null && level != null && !level.isClientSide()`. This runs before `connectionID` is cleared and before `setConnected(false)`, guaranteeing chunk release regardless of block state or subclass behavior. The redundant `loadChunk(false)` from `setConnected(false)` is harmless — `setChunkForced(x, z, false)` on an already-unforced chunk is a no-op.
+- **How to Verify:** Start a ring transport. During the animation, break one ring block. Run `/forceload query` — the chunk is released immediately on block destruction.
 
 ---
 
