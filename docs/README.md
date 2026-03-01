@@ -19,8 +19,13 @@ docs/
 │   ├── Discovery_and_Network.md       ← How rings find each other + privacy mode
 │   └── Limitations_and_Gaps.md        ← Known UX issues + privacy limitations
 └── Audit/
-    ├── README.md                      ← Audit methodology
-    ├── Findings.md                    ← Prioritised findings (F001–F009)
+    ├── README.md                      ← Audit scope, methodology, top 10 recommendations
+    ├── Rubric.md                      ← Consistent checks applied to every object
+    ├── Inventory.md                   ← Complete registry of all gameplay objects
+    ├── Findings.md                    ← Original targeted findings (F001–F009)
+    ├── Findings_Gameplay.md           ← Full gameplay audit (G001–G015)
+    ├── Findings_Packets.md            ← Global packet validation matrix
+    ├── Findings_Persistence.md        ← NBT/SavedData audit (P001–P007)
     └── Test_Plan.md                   ← Manual reproduction steps
 ```
 

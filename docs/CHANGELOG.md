@@ -1,5 +1,29 @@
 # Documentation Changelog
 
+## 2026-03-01 (Update 4)
+
+### Full Gameplay Surface Audit
+
+Comprehensive audit of all registered blocks, items, block entities, menus, packets, and SavedData classes.
+
+**New documentation:**
+- `docs/Audit/Inventory.md` — Complete registry of ~60 blocks, ~50 items, ~25 BEs, 13 menus, 5 serverbound packets, 7 SavedData classes
+- `docs/Audit/Rubric.md` — Consistent audit checks for blocks, items, BEs, and packets
+- `docs/Audit/Findings_Gameplay.md` — 15 gameplay findings (G001–G015)
+- `docs/Audit/Findings_Packets.md` — Global packet validation matrix with cross-references
+- `docs/Audit/Findings_Persistence.md` — 7 persistence/NBT findings (P001–P007)
+- `docs/Audit/README.md` — Updated scope, methodology, top 10 recommendations, statistics
+
+**Key High-severity findings:**
+- G001: DHD packet has no distance check (same pattern as fixed F001)
+- G002: Interface packet has no distance check
+- G003: Transceiver packet has no distance check
+- G004: Stargate chunk force-loading has same vulnerability as fixed F002
+
+**Statistics:** 31 total findings across F/G/P series. 0 Critical, 4 High (unfixed), 10 Medium, 11 Low.
+
+---
+
 ## 2026-03-01 (Update 3)
 
 ### Audit Fixes: F001 and F002
