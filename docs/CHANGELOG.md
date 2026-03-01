@@ -26,6 +26,10 @@
 - **G003 (FIXED):** Distance check on `ServerboundTransceiverUpdatePacket`
 - **G004 (FIXED):** Defensive `setChunkForced(false)` in `AbstractStargateEntity.resetStargate()`
 
+### Energy Systems Documentation
+
+- `docs/Power/ENERGY_SYSTEMS.md` — All energy sources, storage, consumers, FE capability matrix, cross-mod compatibility analysis
+
 ### Audit Documentation
 
 - Full gameplay-surface audit: ~60 blocks, ~50 items, ~25 BEs, 13 menus, 5 packets, 7 SavedData classes

@@ -18,6 +18,8 @@ docs/
 │   ├── UI_and_Inventory.md            ← GUI, slots, memory crystals
 │   ├── Discovery_and_Network.md       ← How rings find each other + privacy mode
 │   └── Limitations_and_Gaps.md        ← Known UX issues + privacy limitations
+├── Power/
+│   └── ENERGY_SYSTEMS.md             ← All energy sources, FE capability matrix, cross-mod compatibility
 └── Audit/
     ├── README.md                      ← Audit scope, methodology, top 10 recommendations
     ├── Rubric.md                      ← Consistent checks applied to every object
