@@ -167,18 +167,22 @@ Findings from auditing all blocks, items, tools, weapons, interfaces, and integr
 
 ---
 
-## G012: Cable Network BFS On Every Block Update
+## G012: Cable Network BFS On Every Block Update — FIXED
 
 - **Severity:** Medium
+- **Status:** Fixed
 - **Affected:** All cable types — `CableBlock`, `ConduitNetworks`
-- **Impact:** When a cable is placed or broken, `ConduitNetworks.update()` runs a BFS traversal of all connected cables (up to `max_cables_in_network`, default 4096). This is correct for maintaining network integrity but can cause lag spikes for very large networks during rapid placement/breaking.
-- **Evidence:** `ConduitNetworks.findConnectedCables()` — BFS up to 4096 nodes.
-- **Repro:**
-  1. Build a cable network with 4000 cables.
-  2. Break a cable in the middle.
-  3. Observe: BFS runs on each resulting network segment.
-- **Suggested Fix:** The 4096 cap is a reasonable limit. For further optimization, defer BFS to end-of-tick to batch multiple changes. Current behaviour is acceptable.
-- **Verify:** N/A.
+- **Impact:** When a cable was placed or broken, `ConduitNetworks.update()` immediately ran a BFS traversal of all connected cables (up to `max_cables_in_network`, default 4096). Breaking a cable in a large network triggered BFS separately for each neighbor's state change, resulting in redundant traversals of the same network segments.
+- **Evidence:** `ConduitNetworks.findConnectedCables()` — BFS up to 4096 nodes, previously called immediately from `CableBlock.updateCable()`.
+- **Fix Applied:** One-tick deferred batching with visited-set coalescing:
+  - **`ConduitNetworks.update(Level, BlockPos)`**: Now just adds the position to a per-dimension `pendingUpdates` set (O(1)). No BFS runs at call time.
+  - **`ConduitNetworks.processPendingUpdates(MinecraftServer)`**: Runs once per server tick via `ForgeEvents.onTick()`. Iterates all dirty positions per dimension. Uses a `visited` set: when BFS discovers cables, all their positions are marked visited so subsequent dirty positions in the same connected component skip BFS entirely.
+  - **`ForgeEvents.onTick()`**: Added `ConduitNetworks.get(server).processPendingUpdates(server)` after existing network handlers.
+  - **`removeCable()`**: Unchanged — still immediate O(1) removal of old network from `cableMap`.
+  - **Timing**: Network updates are deferred by at most 1 tick. Energy transfer to a newly-placed cable is available starting the tick after placement. This matches normal Minecraft block update timing.
+  - **Coalescing**: If a cable is broken in a 1000-cable network with 4 neighbors, instead of 4 separate BFS traversals in the same tick, only 1–2 BFS runs occur (one per resulting connected component, skipping duplicates via visited set).
+  - **Safety**: Pending positions are cleared each tick. If a chunk unloads before processing, BFS from that position finds no cables and is a no-op. No memory leak — `pendingUpdates` is transient (not serialized to NBT).
+- **Verify:** Place and break 200 cables rapidly. Confirm no lag spike. Profile with Spark: BFS runs at most once per connected component per tick.
 
 ---
 

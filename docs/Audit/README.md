@@ -52,7 +52,7 @@ Severity follows the rubric in `Rubric.md`:
 | 6 | P001 | Log warning on StargateNetwork version migration | Medium | **IMPROVED** |
 | 7 | P003 | Clean orphaned UUID entries in BlockEntityList | Medium | **FIXED** |
 | 8 | G008 | Cap GDO/Transceiver transmission scan radius | Medium | **FIXED** |
-| 9 | G012 | Defer cable BFS to end-of-tick | Medium | Open |
+| 9 | G012 | Defer cable BFS to end-of-tick | Medium | **FIXED** |
 | 10 | F004 | Guard `handleConnections()` with `isEmpty()` | Medium | **FIXED** |
 
 ## Statistics

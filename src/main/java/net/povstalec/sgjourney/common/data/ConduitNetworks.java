@@ -15,6 +15,9 @@ import net.povstalec.sgjourney.StargateJourney;
 import net.povstalec.sgjourney.common.block_entities.tech.CableBlockEntity;
 import net.povstalec.sgjourney.common.config.CommonCableConfig;
 
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.server.level.ServerLevel;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
@@ -26,288 +29,319 @@ import java.util.*;
  */
 public class ConduitNetworks extends SavedData
 {
-	private static final String FILE_NAME = StargateJourney.MODID + "-conduits";
-	
-	public static final String CABLES = "cables";
-	
-	private MinecraftServer server;
-	
-	protected HashMap<Integer, ConduitNetwork> cableMap = new HashMap<>();
-	
-	private int createCableNetwork()
-	{
-		Random random = new Random();
-		int id = 0;
-		
-		while(id == 0 || cableMap.containsKey(id))
-		{
-			id = random.nextInt();
-		}
-		
-		return id;
-	}
-	
-	@Nullable
-	public ConduitNetwork getCableNetwork(int id)
-	{
-		if(id == 0)
-			return null;
-		
-		return cableMap.get(id);
-	}
-	
-	public void update(Level level, BlockPos pos)
-	{
-		List<CableBlockEntity> cables = findConnectedCables(level, pos);
-		
-		if(!cables.isEmpty())
-		{
-			int id = createCableNetwork();
-			ConduitNetwork newNetwork = new ConduitNetwork(id);
-			for(CableBlockEntity cable : cables)
-			{
-				cableMap.remove(cable.networkID()); // Remove any old networks, because we'll be replacing them with a new one
-				
-				if(cable.isOutput())
-					newNetwork.outputs.add(cable.getBlockPos());
-				cable.setNetworkID(id);
-			}
-			
-			if(!newNetwork.outputs.isEmpty())
-				cableMap.put(id, newNetwork);
-		}
-		this.setDirty();
-	}
-	
-	public void removeCable(Level level, BlockPos pos)
-	{
-		if(level.getBlockEntity(pos) instanceof CableBlockEntity cable)
-			cableMap.remove(cable.networkID());
-	}
-	
-	public void printConduits()
-	{
-		for(Map.Entry<Integer, ConduitNetwork> entry : cableMap.entrySet())
-		{
-			System.out.println(entry.getKey() + " " + entry.getValue());
-		}
-	}
-	
-	//================================================================================================
-	
-	private CompoundTag serializeCables(HolderLookup.Provider provider)
-	{
-		CompoundTag cables = new CompoundTag();
-		
-		this.cableMap.forEach((id, cableNetwork) ->
-		{
-			if(!cableNetwork.outputs.isEmpty())
-				cables.put(id.toString(), cableNetwork.serializeNBT(provider));
-		});
-		
-		return cables;
-	}
-	
-	public CompoundTag serialize(HolderLookup.Provider provider)
-	{
-		CompoundTag conduitNetworks = new CompoundTag();
-		CompoundTag cables = serializeCables(provider);
-		
-		conduitNetworks.put(CABLES, cables);
-		
-		return conduitNetworks;
-	}
-	
-	private void deserializeCables(HolderLookup.Provider provider, CompoundTag blockEntityList)
-	{
-		CompoundTag cables = blockEntityList.getCompound(CABLES);
-		for(String idString : cables.getAllKeys())
-		{
-			int id = Integer.valueOf(idString);
-			ConduitNetwork cableNetwork = new ConduitNetwork(id);
-			cableNetwork.deserializeNBT(provider, cables.getCompound(idString));
-			this.cableMap.put(id, cableNetwork);
-		}
-	}
-	
-	public void deserialize(HolderLookup.Provider provider, CompoundTag tag)
-	{
-		deserializeCables(provider, tag);
-	}
-	
-	//================================================================================================
-	
-	public ConduitNetworks(MinecraftServer server)
-	{
-		this.server = server;
-	}
+        private static final String FILE_NAME = StargateJourney.MODID + "-conduits";
+        
+        public static final String CABLES = "cables";
+        
+        private MinecraftServer server;
+        
+        protected HashMap<Integer, ConduitNetwork> cableMap = new HashMap<>();
+        private final Map<ResourceKey<Level>, Set<BlockPos>> pendingUpdates = new HashMap<>();
+        
+        private int createCableNetwork()
+        {
+                Random random = new Random();
+                int id = 0;
+                
+                while(id == 0 || cableMap.containsKey(id))
+                {
+                        id = random.nextInt();
+                }
+                
+                return id;
+        }
+        
+        @Nullable
+        public ConduitNetwork getCableNetwork(int id)
+        {
+                if(id == 0)
+                        return null;
+                
+                return cableMap.get(id);
+        }
+        
+        public void update(Level level, BlockPos pos)
+        {
+                pendingUpdates.computeIfAbsent(level.dimension(), k -> new HashSet<>()).add(pos.immutable());
+        }
+        
+        public void processPendingUpdates(MinecraftServer server)
+        {
+                if(pendingUpdates.isEmpty())
+                        return;
+                
+                Map<ResourceKey<Level>, Set<BlockPos>> snapshot = new HashMap<>(pendingUpdates);
+                pendingUpdates.clear();
+                
+                for(Map.Entry<ResourceKey<Level>, Set<BlockPos>> entry : snapshot.entrySet())
+                {
+                        ServerLevel level = server.getLevel(entry.getKey());
+                        if(level == null)
+                                continue;
+                        
+                        Set<BlockPos> dirty = entry.getValue();
+                        Set<BlockPos> visited = new HashSet<>();
+                        
+                        for(BlockPos dirtyPos : dirty)
+                        {
+                                if(visited.contains(dirtyPos))
+                                        continue;
+                                
+                                List<CableBlockEntity> cables = findConnectedCables(level, dirtyPos);
+                                
+                                for(CableBlockEntity cable : cables)
+                                        visited.add(cable.getBlockPos());
+                                
+                                if(!cables.isEmpty())
+                                {
+                                        int id = createCableNetwork();
+                                        ConduitNetwork newNetwork = new ConduitNetwork(id);
+                                        for(CableBlockEntity cable : cables)
+                                        {
+                                                cableMap.remove(cable.networkID());
+                                                
+                                                if(cable.isOutput())
+                                                        newNetwork.outputs.add(cable.getBlockPos());
+                                                cable.setNetworkID(id);
+                                        }
+                                        
+                                        if(!newNetwork.outputs.isEmpty())
+                                                cableMap.put(id, newNetwork);
+                                }
+                        }
+                }
+                this.setDirty();
+        }
+        
+        public void removeCable(Level level, BlockPos pos)
+        {
+                if(level.getBlockEntity(pos) instanceof CableBlockEntity cable)
+                        cableMap.remove(cable.networkID());
+        }
+        
+        public void printConduits()
+        {
+                for(Map.Entry<Integer, ConduitNetwork> entry : cableMap.entrySet())
+                {
+                        System.out.println(entry.getKey() + " " + entry.getValue());
+                }
+        }
+        
+        //================================================================================================
+        
+        private CompoundTag serializeCables(HolderLookup.Provider provider)
+        {
+                CompoundTag cables = new CompoundTag();
+                
+                this.cableMap.forEach((id, cableNetwork) ->
+                {
+                        if(!cableNetwork.outputs.isEmpty())
+                                cables.put(id.toString(), cableNetwork.serializeNBT(provider));
+                });
+                
+                return cables;
+        }
+        
+        public CompoundTag serialize(HolderLookup.Provider provider)
+        {
+                CompoundTag conduitNetworks = new CompoundTag();
+                CompoundTag cables = serializeCables(provider);
+                
+                conduitNetworks.put(CABLES, cables);
+                
+                return conduitNetworks;
+        }
+        
+        private void deserializeCables(HolderLookup.Provider provider, CompoundTag blockEntityList)
+        {
+                CompoundTag cables = blockEntityList.getCompound(CABLES);
+                for(String idString : cables.getAllKeys())
+                {
+                        int id = Integer.valueOf(idString);
+                        ConduitNetwork cableNetwork = new ConduitNetwork(id);
+                        cableNetwork.deserializeNBT(provider, cables.getCompound(idString));
+                        this.cableMap.put(id, cableNetwork);
+                }
+        }
+        
+        public void deserialize(HolderLookup.Provider provider, CompoundTag tag)
+        {
+                deserializeCables(provider, tag);
+        }
+        
+        //================================================================================================
+        
+        public ConduitNetworks(MinecraftServer server)
+        {
+                this.server = server;
+        }
 
-	public static ConduitNetworks create(MinecraftServer server)
-	{
-		return new ConduitNetworks(server);
-	}
-	
-	public static ConduitNetworks load(MinecraftServer server, HolderLookup.Provider provider, CompoundTag tag)
-	{
-		ConduitNetworks data = create(server);
+        public static ConduitNetworks create(MinecraftServer server)
+        {
+                return new ConduitNetworks(server);
+        }
+        
+        public static ConduitNetworks load(MinecraftServer server, HolderLookup.Provider provider, CompoundTag tag)
+        {
+                ConduitNetworks data = create(server);
 
-		data.server = server;
-		
-		data.deserialize(provider, tag);
-		
-		return data;
-	}
+                data.server = server;
+                
+                data.deserialize(provider, tag);
+                
+                return data;
+        }
 
-	public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider)
-	{
-		tag = serialize(provider);
-		
-		return tag;
-	}
-	
-	public static SavedData.Factory<ConduitNetworks> dataFactory(MinecraftServer server)
-	{
-		return new SavedData.Factory<>(() -> create(server), (tag, provider) -> load(server, provider, tag));
-	}
-	
-	@Nonnull
-	public static ConduitNetworks get(Level level)
-	{
-		if(level.isClientSide())
-			throw new RuntimeException("Don't access this client-side!");
-		
-		return ConduitNetworks.get(level.getServer());
-	}
+        public CompoundTag save(CompoundTag tag, HolderLookup.Provider provider)
+        {
+                tag = serialize(provider);
+                
+                return tag;
+        }
+        
+        public static SavedData.Factory<ConduitNetworks> dataFactory(MinecraftServer server)
+        {
+                return new SavedData.Factory<>(() -> create(server), (tag, provider) -> load(server, provider, tag));
+        }
+        
+        @Nonnull
+        public static ConduitNetworks get(Level level)
+        {
+                if(level.isClientSide())
+                        throw new RuntimeException("Don't access this client-side!");
+                
+                return ConduitNetworks.get(level.getServer());
+        }
 
     @Nonnull
-	public static ConduitNetworks get(MinecraftServer server)
+        public static ConduitNetworks get(MinecraftServer server)
     {
-    	DimensionDataStorage storage = server.overworld().getDataStorage();
+        DimensionDataStorage storage = server.overworld().getDataStorage();
         
         return storage.computeIfAbsent(dataFactory(server), FILE_NAME);
     }
-	
-	
-	/**
-	 * Breadth First Search through the cable network. Returns a set of all found Cable Block Entities
-	 * @param level
-	 * @param startingPos
-	 */
-	public static List<CableBlockEntity> findConnectedCables(Level level, BlockPos startingPos)
-	{
-		Block cableBlock = level.getBlockState(startingPos).getBlock();
-		
-		List<CableBlockEntity> cables = new ArrayList<>();
-		Set<BlockPos> visited = new HashSet<>();
-		Queue<BlockPos> queue = new LinkedList<>();
-		queue.add(startingPos);
-		
-		for(int i = 0; !queue.isEmpty() && i < CommonCableConfig.max_cables_in_network.get(); i++)
-		{
-			BlockPos pos = queue.remove();
-			visited.add(pos);
-			
-			if(level.getBlockState(pos).getBlock() == cableBlock)
-			{
-				if(level.getBlockEntity(pos) instanceof CableBlockEntity cable)
-					cables.add(cable);
-				
-				for(Direction direction : Direction.values())
-				{
-					BlockPos visitPos = pos.relative(direction);
-					
-					if(!visited.contains(visitPos))
-						queue.add(visitPos);
-				}
-			}
-		}
-		
-		return cables;
-	}
-	
-	
-	
-	public static class ConduitNetwork implements INBTSerializable<CompoundTag>
-	{
-		private int id;
-		private Set<BlockPos> outputs;
-		
-		public ConduitNetwork(int id)
-		{
-			this.id = id;
-			this.outputs = new HashSet<>();
-		}
-		
-		/**
-		 * Transfers energy through the local grid
-		 * @param level Level in which we're transferring
-		 * @param toTransfer Energy to transfer
-		 * @param simulate If TRUE, the insertion will only be simulated.
-		 * @return amount of energy successfully transferred
-		 */
-		public long transferEnergy(Level level, long toTransfer, boolean simulate, boolean zeroPointEnergy)
-		{
-			if(toTransfer <= 0 || outputs.isEmpty())
-				return 0;
-			
-			int totalOutputs = 0;
-			
-			for(BlockPos pos : outputs)
-			{
-				BlockEntity blockEntity = level.getBlockEntity(pos);
-				if(blockEntity instanceof CableBlockEntity cable)
-					totalOutputs += cable.validOutputs();
-			}
-			
-			if(totalOutputs == 0)
-				return 0;
-			
-			long transferred = 0;
-			long amount = toTransfer / totalOutputs;
-			
-			for(BlockPos pos : outputs)
-			{
-				BlockEntity blockEntity = level.getBlockEntity(pos);
-				if(blockEntity instanceof CableBlockEntity cable)
-				{
-					for(Direction direction : cable.getConnectedSides())
-					{
-						transferred += cable.outputEnergy(direction, amount, simulate, zeroPointEnergy);
-					}
-				}
-			}
-			
-			return transferred;
-		}
-		
-		@Override
-		public String toString()
-		{
-			return outputs.toString();
-		}
-		
-		@Override
-		public CompoundTag serializeNBT(HolderLookup.Provider provider)
-		{
-			CompoundTag tag = new CompoundTag();
-			int i = 0;
-			for(BlockPos pos : outputs)
-			{
-				tag.putIntArray(String.valueOf(i),  new int[]{pos.getX(), pos.getY(), pos.getZ()});
-				i++;
-			}
-			
-			return tag;
-		}
-		
-		@Override
-		public void deserializeNBT(HolderLookup.Provider provider, CompoundTag tag)
-		{
-			for(String key : tag.getAllKeys())
-			{
-				int[] xyz = tag.getIntArray(key);
-				outputs.add(new BlockPos(xyz[0], xyz[1], xyz[2]));
-			}
-		}
-	}
+        
+        
+        /**
+         * Breadth First Search through the cable network. Returns a set of all found Cable Block Entities
+         * @param level
+         * @param startingPos
+         */
+        public static List<CableBlockEntity> findConnectedCables(Level level, BlockPos startingPos)
+        {
+                Block cableBlock = level.getBlockState(startingPos).getBlock();
+                
+                List<CableBlockEntity> cables = new ArrayList<>();
+                Set<BlockPos> visited = new HashSet<>();
+                Queue<BlockPos> queue = new LinkedList<>();
+                queue.add(startingPos);
+                
+                for(int i = 0; !queue.isEmpty() && i < CommonCableConfig.max_cables_in_network.get(); i++)
+                {
+                        BlockPos pos = queue.remove();
+                        visited.add(pos);
+                        
+                        if(level.getBlockState(pos).getBlock() == cableBlock)
+                        {
+                                if(level.getBlockEntity(pos) instanceof CableBlockEntity cable)
+                                        cables.add(cable);
+                                
+                                for(Direction direction : Direction.values())
+                                {
+                                        BlockPos visitPos = pos.relative(direction);
+                                        
+                                        if(!visited.contains(visitPos))
+                                                queue.add(visitPos);
+                                }
+                        }
+                }
+                
+                return cables;
+        }
+        
+        
+        
+        public static class ConduitNetwork implements INBTSerializable<CompoundTag>
+        {
+                private int id;
+                private Set<BlockPos> outputs;
+                
+                public ConduitNetwork(int id)
+                {
+                        this.id = id;
+                        this.outputs = new HashSet<>();
+                }
+                
+                /**
+                 * Transfers energy through the local grid
+                 * @param level Level in which we're transferring
+                 * @param toTransfer Energy to transfer
+                 * @param simulate If TRUE, the insertion will only be simulated.
+                 * @return amount of energy successfully transferred
+                 */
+                public long transferEnergy(Level level, long toTransfer, boolean simulate, boolean zeroPointEnergy)
+                {
+                        if(toTransfer <= 0 || outputs.isEmpty())
+                                return 0;
+                        
+                        int totalOutputs = 0;
+                        
+                        for(BlockPos pos : outputs)
+                        {
+                                BlockEntity blockEntity = level.getBlockEntity(pos);
+                                if(blockEntity instanceof CableBlockEntity cable)
+                                        totalOutputs += cable.validOutputs();
+                        }
+                        
+                        if(totalOutputs == 0)
+                                return 0;
+                        
+                        long transferred = 0;
+                        long amount = toTransfer / totalOutputs;
+                        
+                        for(BlockPos pos : outputs)
+                        {
+                                BlockEntity blockEntity = level.getBlockEntity(pos);
+                                if(blockEntity instanceof CableBlockEntity cable)
+                                {
+                                        for(Direction direction : cable.getConnectedSides())
+                                        {
+                                                transferred += cable.outputEnergy(direction, amount, simulate, zeroPointEnergy);
+                                        }
+                                }
+                        }
+                        
+                        return transferred;
+                }
+                
+                @Override
+                public String toString()
+                {
+                        return outputs.toString();
+                }
+                
+                @Override
+                public CompoundTag serializeNBT(HolderLookup.Provider provider)
+                {
+                        CompoundTag tag = new CompoundTag();
+                        int i = 0;
+                        for(BlockPos pos : outputs)
+                        {
+                                tag.putIntArray(String.valueOf(i),  new int[]{pos.getX(), pos.getY(), pos.getZ()});
+                                i++;
+                        }
+                        
+                        return tag;
+                }
+                
+                @Override
+                public void deserializeNBT(HolderLookup.Provider provider, CompoundTag tag)
+                {
+                        for(String key : tag.getAllKeys())
+                        {
+                                int[] xyz = tag.getIntArray(key);
+                                outputs.add(new BlockPos(xyz[0], xyz[1], xyz[2]));
+                        }
+                }
+        }
 }

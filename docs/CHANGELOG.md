@@ -1,5 +1,25 @@
 # Documentation Changelog
 
+## 2026-03-01 (Update 7)
+
+### Phase 3: Cable Network BFS Batching (G012)
+
+**Code changes:**
+- **`ConduitNetworks.java`**: `update(Level, BlockPos)` now adds the position to a per-dimension `pendingUpdates` set instead of running BFS immediately. New `processPendingUpdates(MinecraftServer)` method runs once per server tick, iterating all dirty positions with visited-set coalescing so each connected component is BFS'd at most once per tick.
+- **`ForgeEvents.java`**: Added `ConduitNetworks.get(server).processPendingUpdates(server)` to `onTick(ServerTickEvent.Pre)`.
+- **`removeCable()`** unchanged — immediate O(1) removal of old network from `cableMap`.
+- `pendingUpdates` is transient (not serialized); cleared each tick. No memory leak.
+
+**Documentation updates:**
+- `Findings_Gameplay.md` — G012 marked FIXED with batching strategy details
+- `Test_Plan.md` — Added 4 test cases (rapid place/break, power propagation, chunk boundary, large network)
+- `Audit/README.md` — Top 10 table: all 10 findings now fixed/improved
+- `CHANGELOG.md` — Phase 3 entry
+
+**Build:** Successful.
+
+---
+
 ## 2026-03-01 (Update 6)
 
 ### Performance & Structural Hygiene Sprint (Phase 2)

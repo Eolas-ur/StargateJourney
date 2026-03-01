@@ -170,6 +170,31 @@
 
 ---
 
+## G012: Cable Network BFS Batching — FIXED
+
+### Test 1: Rapid Placement/Breaking
+1. Build a cable line of 200 cables.
+2. Rapidly break and replace 10 cables in the middle using fast block-breaking tools.
+3. Observe: no lag spike. Network settles within 1 tick of last change.
+
+### Test 2: Power Propagation
+1. Place a Naquadah Generator connected through 50 cables to a Battery.
+2. Toggle the generator on and off rapidly.
+3. Verify power propagation stabilises correctly after each toggle — energy flows within 1 tick of network settling.
+
+### Test 3: Chunk Boundary
+1. Run a cable line across a chunk border.
+2. Unload and reload the far chunk (move far away and return).
+3. Place and break cables near the chunk boundary.
+4. Verify: network connectivity is correct after changes.
+
+### Test 4: Large Network
+1. Build a network of 1000+ cables with multiple branches.
+2. Break a cable at a branch point.
+3. Profile with Spark: BFS should run at most once per resulting connected component, not once per dirty position.
+
+---
+
 ## G004: Stargate Chunk Force-Loading Release — FIXED
 
 ### Setup
