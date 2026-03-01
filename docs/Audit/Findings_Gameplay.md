@@ -110,21 +110,17 @@ Findings from auditing all blocks, items, tools, weapons, interfaces, and integr
 
 ---
 
-## G008: GDO/Transceiver Transmission Scans All Loaded Chunks
+## G008: GDO/Transceiver Transmission Scans All Loaded Chunks — FIXED
 
 - **Severity:** Medium
+- **Status:** Fixed
 - **Affected:** `sgjourney:gdo` — `GDOItem`, `sgjourney:transceiver` — `TransceiverEntity`
 - **Impact:** `sendTransmission()` iterates through all loaded chunks within the configured transmission radius and calls `getBlockEntities()` on each. With large transmission distances and many loaded chunks, this can cause lag spikes. The scan runs once per button press (not per tick), so impact is moderate.
 - **Evidence:**
   - `GDOItem.sendTransmission()` — iterates loaded chunks within radius.
   - `TransceiverEntity.sendTransmission()` — same pattern.
-- **Repro:**
-  1. Set `max_transceiver_transmission_distance` to a very large value.
-  2. Load many chunks (multiple players spread out).
-  3. Press Transmit on a Transceiver.
-  4. Observe: momentary lag spike.
-- **Suggested Fix:** Add a cap on the scan radius or use a spatial index. Current default is likely reasonable for normal gameplay.
-- **Verify:** Profile with Spark during transmission.
+- **Fix Applied:** Added configurable chunk scan cap (`max_transmission_scan_chunks` in `CommonTransmissionConfig`, default 81, range 9–289). All four scan loops (`GDOItem.sendTransmission()`, `GDOItem.checkShieldingState()`, `TransceiverEntity.sendTransmission()`, `TransceiverEntity.checkShieldingState()`) now track `chunksScanned` and break when exceeding the configured limit. Default 81 corresponds to a 9×9 chunk grid (~64 block radius). Default transmission radius (20 blocks) scans only 25 chunks, unaffected by the cap.
+- **Verify:** Set transmission distance to 128. Scan completes after 81 chunks instead of 289. Default radius (20) behavior unchanged.
 
 ---
 
@@ -140,21 +136,22 @@ Findings from auditing all blocks, items, tools, weapons, interfaces, and integr
 
 ---
 
-## G010: Tech Block Entities Call updateClient() Every Tick
+## G010: Tech Block Entities Call updateClient() Every Tick — FIXED
 
 - **Severity:** Medium
-- **Affected:** `NaquadahGeneratorEntity`, `BatteryBlockEntity`, `ZPMHubEntity`, `TransceiverEntity`, all `AbstractInterfaceEntity` subclasses
-- **Impact:** Every tick, these block entities call `updateClient()` which triggers `level.sendBlockUpdated()`. This sends a block entity data packet to all players tracking the chunk, even when no data has changed. With many generators/batteries in a single chunk, this adds unnecessary network traffic and garbage collection pressure.
-- **Evidence:**
-  - `NaquadahGeneratorEntity.tick()` — calls `updateClient()` unconditionally.
-  - `BatteryBlockEntity.tick()` — same pattern.
-  - `ZPMHubEntity.tick()` — same pattern.
-- **Repro:**
-  1. Place 20 Naquadah Generators in a single chunk.
-  2. Profile network traffic with Spark or a packet sniffer.
-  3. Observe: 20 block update packets per tick even when idle.
-- **Suggested Fix:** Track a `dirty` flag and only call `updateClient()` when state actually changes. For generators, set dirty when `reactionProgress` changes; for batteries, when energy level changes.
-- **Verify:** Profile network traffic; no block updates when generators are idle.
+- **Status:** Fixed
+- **Affected:** `NaquadahGeneratorEntity`, `BatteryBlockEntity`, `TransceiverEntity`, all `AbstractInterfaceEntity` subclasses, `AbstractCrystallizerEntity`, `AbstractNaquadahLiquidizerEntity`
+- **Impact:** Every tick, these block entities call `updateClient()` which triggers `blockChanged()`. This sends a block entity data packet to all players tracking the chunk, even when no data has changed. With many generators/batteries in a single chunk, this adds unnecessary network traffic and garbage collection pressure.
+- **Fix Applied:** Dirty-flag-driven client sync across all affected BEs:
+  - **`EnergyBlockEntity`** (base class): Added `protected boolean clientDirty`. Set `true` in `changeEnergy()` when `!simulate`, covering all energy changes for generators, batteries, interfaces, and crystallizers.
+  - **`NaquadahGeneratorEntity`**: Also sets dirty on `reactionProgress` changes. Throttled sync: `if(clientDirty && level.getGameTime() % 10 == 0)`.
+  - **`BatteryBlockEntity`**: Energy changes already covered by base class. Throttled sync (every 10 ticks when dirty).
+  - **`AbstractInterfaceEntity`**: Sets dirty on symbol changes. Throttled sync.
+  - **`AbstractCrystallizerEntity`**: Sets dirty on progress changes. Throttled sync.
+  - **`AbstractNaquadahLiquidizerEntity`** (extends `BlockEntity`): Added `clientDirty` field directly. Sets dirty on progress changes. Throttled sync.
+  - **`TransceiverEntity`** (extends `BlockEntity`): Added `clientDirty` field directly. Sets dirty on `setFrequency()`, `setCurrentCode()`, `toggleFrequency()`, `addToCode()`, `removeFromCode()`. Immediate sync (no throttle) since state changes are rare/user-driven.
+  - **Throttle**: Energy-intensive BEs sync at most once per 10 ticks (0.5 seconds) when dirty. Zero syncs when idle. Client-visible state change delay is imperceptible for numerical displays.
+- **Verify:** Place 20 idle generators. Profile network traffic — zero block update packets. Place an active generator — syncs every 10 ticks instead of every tick.
 
 ---
 

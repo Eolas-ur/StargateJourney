@@ -45,15 +45,16 @@
 
 ---
 
-## F004: StargateNetwork.handleConnections() Copies Entire Map Every Tick
+## F004: StargateNetwork.handleConnections() Copies Entire Map Every Tick — FIXED
 
 - **Severity:** Medium
-- **Impact:** `StargateNetwork.handleConnections()` (line 229–236) creates a new `HashMap`, calls `putAll()` to copy every connection entry, then iterates the copy. The same pattern exists in `TransporterNetwork.handleConnections()` (line 210–217). This defensive copy is done to avoid `ConcurrentModificationException` since `connection.tick()` may remove itself from `this.connections`. While functionally correct, it allocates a new HashMap every server tick even when no connections exist. With many concurrent connections, GC pressure increases.
-- **Evidence:**
-  - `StargateNetwork.handleConnections()` (line 229–236)
-  - `TransporterNetwork.handleConnections()` (line 210–217)
-- **Suggested Fix:** Guard with an early return: `if(this.connections.isEmpty()) return;` before the copy. For further optimization, use an iterator-based approach with `iterator.remove()` instead of copying.
-- **How to Verify:** Profile server tick with JVisualVM or Spark. Observe HashMap allocation rate during idle (no active connections). With fix, allocations drop to zero when idle.
+- **Status:** Fixed
+- **Impact:** `StargateNetwork.handleConnections()` and `TransporterNetwork.handleConnections()` created a new `HashMap` with `putAll()` every server tick, even when no connections existed. Also called `setDirty()` every tick regardless.
+- **Fix Applied:**
+  - Added early return `if(this.connections.isEmpty()) return;` to both `StargateNetwork.handleConnections()` and `TransporterNetwork.handleConnections()`.
+  - Changed `new HashMap<>()` + `putAll()` to single-line copy constructor `new HashMap<>(this.connections)`.
+  - When idle (no active connections), zero allocations and no `setDirty()` call.
+- **Verify:** Profile with Spark during idle server. HashMap allocation rate drops to zero when no connections exist.
 
 ---
 

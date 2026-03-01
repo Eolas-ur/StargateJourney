@@ -26,254 +26,262 @@ import net.povstalec.sgjourney.common.items.NaquadahFuelRodItem;
 
 public abstract class NaquadahGeneratorEntity extends EnergyBlockEntity
 {
-	public static final String INVENTORY = "inventory";
-	
-	private int reactionProgress = 0;
-	
-	private final ItemStackHandler itemStackHandler = createHandler();
-	private final Lazy<IItemHandler> lazyItemHandler = Lazy.of(() -> itemStackHandler);
-	
-	public NaquadahGeneratorEntity(BlockEntityType<?> type, BlockPos pos, BlockState state)
-	{
-		super(type, pos, state, true);
-	}
-	
-	@Override
-	public void invalidateCapabilities()
-	{
-		super.invalidateCapabilities();
-		lazyItemHandler.invalidate();
-	}
-	
-	@Override
-	public void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries)
-	{
-		super.loadAdditional(nbt, registries);
-		itemStackHandler.deserializeNBT(registries, nbt.getCompound(INVENTORY));
-	}
-	
-	@Override
-	protected void saveAdditional(@NotNull CompoundTag nbt, HolderLookup.Provider registries)
-	{
-		super.saveAdditional(nbt, registries);
-		nbt.put(INVENTORY, itemStackHandler.serializeNBT(registries));
-	}
-	
-	@Override
-	public ClientboundBlockEntityDataPacket getUpdatePacket()
-	{
-		return ClientboundBlockEntityDataPacket.create(this);
-	}
-	
-	@Override
-	public CompoundTag getUpdateTag(HolderLookup.Provider registries)
-	{
-		return this.saveWithoutMetadata(registries);
-	}
-	
-	//============================================================================================
-	//************************************Getters and setters*************************************
-	//============================================================================================
-	
-	public boolean hasNaquadah()
-	{
-		ItemStack stack = this.itemStackHandler.getStackInSlot(0);
-		
-		if(stack.getItem() instanceof NaquadahFuelRodItem)
-			return NaquadahFuelRodItem.getFuel(stack) > 0;
-		
-		return false;
-	}
-	
-	public void setReactionProgress(int reactionProgress)
-	{
-		this.reactionProgress = reactionProgress;
-	}
-	
-	public int getReactionProgress()
-	{
-		return this.reactionProgress;
-	}
-	
-	public abstract long getReactionTime();
+        public static final String INVENTORY = "inventory";
+        
+        private int reactionProgress = 0;
+        
+        private final ItemStackHandler itemStackHandler = createHandler();
+        private final Lazy<IItemHandler> lazyItemHandler = Lazy.of(() -> itemStackHandler);
+        
+        public NaquadahGeneratorEntity(BlockEntityType<?> type, BlockPos pos, BlockState state)
+        {
+                super(type, pos, state, true);
+        }
+        
+        @Override
+        public void invalidateCapabilities()
+        {
+                super.invalidateCapabilities();
+                lazyItemHandler.invalidate();
+        }
+        
+        @Override
+        public void loadAdditional(CompoundTag nbt, HolderLookup.Provider registries)
+        {
+                super.loadAdditional(nbt, registries);
+                itemStackHandler.deserializeNBT(registries, nbt.getCompound(INVENTORY));
+        }
+        
+        @Override
+        protected void saveAdditional(@NotNull CompoundTag nbt, HolderLookup.Provider registries)
+        {
+                super.saveAdditional(nbt, registries);
+                nbt.put(INVENTORY, itemStackHandler.serializeNBT(registries));
+        }
+        
+        @Override
+        public ClientboundBlockEntityDataPacket getUpdatePacket()
+        {
+                return ClientboundBlockEntityDataPacket.create(this);
+        }
+        
+        @Override
+        public CompoundTag getUpdateTag(HolderLookup.Provider registries)
+        {
+                return this.saveWithoutMetadata(registries);
+        }
+        
+        //============================================================================================
+        //************************************Getters and setters*************************************
+        //============================================================================================
+        
+        public boolean hasNaquadah()
+        {
+                ItemStack stack = this.itemStackHandler.getStackInSlot(0);
+                
+                if(stack.getItem() instanceof NaquadahFuelRodItem)
+                        return NaquadahFuelRodItem.getFuel(stack) > 0;
+                
+                return false;
+        }
+        
+        public void setReactionProgress(int reactionProgress)
+        {
+                this.reactionProgress = reactionProgress;
+        }
+        
+        public int getReactionProgress()
+        {
+                return this.reactionProgress;
+        }
+        
+        public abstract long getReactionTime();
 
-	public abstract long getEnergyPerTick();
+        public abstract long getEnergyPerTick();
 
-	@Nullable
-	public Direction getDirection()
-	{
-		BlockPos gatePos = this.getBlockPos();
-		BlockState gateState = this.level.getBlockState(gatePos);
-		
-		if(gateState.getBlock() instanceof NaquadahGeneratorBlock)
-		{
-			FrontAndTop orientation = gateState.getValue(NaquadahGeneratorBlock.ORIENTATION);
-			
-			if(orientation.top() == Direction.UP)
-				return orientation.front();
-			else
-				return orientation.top();
-		}
+        @Nullable
+        public Direction getDirection()
+        {
+                BlockPos gatePos = this.getBlockPos();
+                BlockState gateState = this.level.getBlockState(gatePos);
+                
+                if(gateState.getBlock() instanceof NaquadahGeneratorBlock)
+                {
+                        FrontAndTop orientation = gateState.getValue(NaquadahGeneratorBlock.ORIENTATION);
+                        
+                        if(orientation.top() == Direction.UP)
+                                return orientation.front();
+                        else
+                                return orientation.top();
+                }
 
-		StargateJourney.LOGGER.error("Couldn't find Direction " + this.getBlockPos().toString());
-		return null;
-	}
-	
-	@Nullable
-	public Direction getBottomDirection()
-	{
-		BlockPos pos = this.getBlockPos();
-		BlockState state = this.level.getBlockState(pos);
-		
-		if(state.getBlock() instanceof NaquadahGeneratorBlock)
-		{
-			FrontAndTop orientation = state.getValue(NaquadahGeneratorBlock.ORIENTATION);
-			return orientation.front().getOpposite();
-		}
+                StargateJourney.LOGGER.error("Couldn't find Direction " + this.getBlockPos().toString());
+                return null;
+        }
+        
+        @Nullable
+        public Direction getBottomDirection()
+        {
+                BlockPos pos = this.getBlockPos();
+                BlockState state = this.level.getBlockState(pos);
+                
+                if(state.getBlock() instanceof NaquadahGeneratorBlock)
+                {
+                        FrontAndTop orientation = state.getValue(NaquadahGeneratorBlock.ORIENTATION);
+                        return orientation.front().getOpposite();
+                }
 
-		StargateJourney.LOGGER.error("Couldn't find Direction " + this.getBlockPos().toString());
-		return null;
-	}
-	
-	public boolean isActive()
-	{
-		BlockPos gatePos = this.getBlockPos();
-		BlockState gateState = this.level.getBlockState(gatePos);
-		
-		if(gateState.getBlock() instanceof NaquadahGeneratorBlock)
-			return gateState.getValue(NaquadahGeneratorBlock.ACTIVE);
+                StargateJourney.LOGGER.error("Couldn't find Direction " + this.getBlockPos().toString());
+                return null;
+        }
+        
+        public boolean isActive()
+        {
+                BlockPos gatePos = this.getBlockPos();
+                BlockState gateState = this.level.getBlockState(gatePos);
+                
+                if(gateState.getBlock() instanceof NaquadahGeneratorBlock)
+                        return gateState.getValue(NaquadahGeneratorBlock.ACTIVE);
 
-		StargateJourney.LOGGER.error("Couldn't find Active state" + this.getBlockPos().toString());
-		return false;
-	}
-	
-	//============================================================================================
-	//****************************************Capabilities****************************************
-	//============================================================================================
-	
-	public IItemHandler getItemHandler(Direction side)
-	{
-		return lazyItemHandler.get();
-	}
-	
-	//============================================================================================
-	//******************************************Storage*******************************************
-	//============================================================================================
-	
-	private ItemStackHandler createHandler()
-	{
-		return new ItemStackHandler(1)
-			{
-				@Override
-				protected void onContentsChanged(int slot)
-				{
-					setChanged();
-				}
-				
-				@Override
-				public boolean isItemValid(int slot, @Nonnull ItemStack stack)
-				{
-					switch(slot)
-					{
-					case 0:
-						return stack.getItem() == ItemInit.NAQUADAH_FUEL_ROD.get();
-					default: 
-						return false;
-					}
-				}
-				
-				// Limits the number of items per slot
-				public int getSlotLimit(int slot)
-				{
-					return 1;
-				}
-				
-				@Nonnull
-				@Override
-				public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate)
-				{
-					if(!isItemValid(slot, stack))
-					{
-						return stack;
-					}
-					
-					return super.insertItem(slot, stack, simulate);
-					
-				}
-			};
-	}
-	
-	//============================================================================================
-	//*******************************************Energy*******************************************
-	//============================================================================================
-	
-	protected boolean isCorrectEnergySide(Direction side)
-	{
-		Direction direction = getDirection();
-		Direction bottom = getBottomDirection();
-		
-		if(direction != null && bottom != null)
-			return side == bottom || side == direction.getClockWise() || side == direction.getCounterClockWise();
-		
-		return false;
-	}
-	
-	protected boolean receivesEnergy()
-	{
-		return false;
-	}
-	
-	//============================================================================================
-	//******************************************Ticking*******************************************
-	//============================================================================================
-	
-	private void doReaction()
-	{
-		if(!isActive())
-			return;
-		
-		if(this.hasNaquadah() && reactionProgress == 0)
-		{
-			if(NaquadahFuelRodItem.depleteFuel(this.itemStackHandler.getStackInSlot(0)))
-				this.progressReaction();
-			else
-				this.itemStackHandler.extractItem(0, 1, false); //TODO Maybe make fuel rods reusable?
-		}
-		
-		else if(reactionProgress > 0 && reactionProgress < getReactionTime() && getEnergyStored() < capacity() && canReceive(getEnergyPerTick()))
-			this.progressReaction();
-		
-		else if(reactionProgress >= getReactionTime())
-			reactionProgress = 0;
-	}
-	
-	private void progressReaction()
-	{
-		this.generateEnergy(getEnergyPerTick());
-		this.reactionProgress++;
-	}
-	
-	public void updateClient()
-	{
-		if(!level.isClientSide())
-			((ServerLevel) level).getChunkSource().blockChanged(worldPosition);
-	}
-	
-	public static void tick(Level level, BlockPos pos, BlockState state, NaquadahGeneratorEntity generator)
-	{
-		if(level.isClientSide())
-			return;
-		
-		generator.doReaction();
-		
-		Direction direction = generator.getDirection();
-		if(direction != null)
-		{
-			generator.outputEnergy(generator.getBottomDirection());
-			generator.outputEnergy(direction.getClockWise());
-			generator.outputEnergy(direction.getCounterClockWise());
-		}
-		
-		generator.updateClient();
-	}
+                StargateJourney.LOGGER.error("Couldn't find Active state" + this.getBlockPos().toString());
+                return false;
+        }
+        
+        //============================================================================================
+        //****************************************Capabilities****************************************
+        //============================================================================================
+        
+        public IItemHandler getItemHandler(Direction side)
+        {
+                return lazyItemHandler.get();
+        }
+        
+        //============================================================================================
+        //******************************************Storage*******************************************
+        //============================================================================================
+        
+        private ItemStackHandler createHandler()
+        {
+                return new ItemStackHandler(1)
+                        {
+                                @Override
+                                protected void onContentsChanged(int slot)
+                                {
+                                        setChanged();
+                                }
+                                
+                                @Override
+                                public boolean isItemValid(int slot, @Nonnull ItemStack stack)
+                                {
+                                        switch(slot)
+                                        {
+                                        case 0:
+                                                return stack.getItem() == ItemInit.NAQUADAH_FUEL_ROD.get();
+                                        default: 
+                                                return false;
+                                        }
+                                }
+                                
+                                // Limits the number of items per slot
+                                public int getSlotLimit(int slot)
+                                {
+                                        return 1;
+                                }
+                                
+                                @Nonnull
+                                @Override
+                                public ItemStack insertItem(int slot, @Nonnull ItemStack stack, boolean simulate)
+                                {
+                                        if(!isItemValid(slot, stack))
+                                        {
+                                                return stack;
+                                        }
+                                        
+                                        return super.insertItem(slot, stack, simulate);
+                                        
+                                }
+                        };
+        }
+        
+        //============================================================================================
+        //*******************************************Energy*******************************************
+        //============================================================================================
+        
+        protected boolean isCorrectEnergySide(Direction side)
+        {
+                Direction direction = getDirection();
+                Direction bottom = getBottomDirection();
+                
+                if(direction != null && bottom != null)
+                        return side == bottom || side == direction.getClockWise() || side == direction.getCounterClockWise();
+                
+                return false;
+        }
+        
+        protected boolean receivesEnergy()
+        {
+                return false;
+        }
+        
+        //============================================================================================
+        //******************************************Ticking*******************************************
+        //============================================================================================
+        
+        private void doReaction()
+        {
+                if(!isActive())
+                        return;
+                
+                if(this.hasNaquadah() && reactionProgress == 0)
+                {
+                        if(NaquadahFuelRodItem.depleteFuel(this.itemStackHandler.getStackInSlot(0)))
+                                this.progressReaction();
+                        else
+                                this.itemStackHandler.extractItem(0, 1, false); //TODO Maybe make fuel rods reusable?
+                }
+                
+                else if(reactionProgress > 0 && reactionProgress < getReactionTime() && getEnergyStored() < capacity() && canReceive(getEnergyPerTick()))
+                        this.progressReaction();
+                
+                else if(reactionProgress >= getReactionTime())
+                {
+                        reactionProgress = 0;
+                        this.clientDirty = true;
+                }
+        }
+        
+        private void progressReaction()
+        {
+                this.generateEnergy(getEnergyPerTick());
+                this.reactionProgress++;
+                this.clientDirty = true;
+        }
+        
+        public void updateClient()
+        {
+                if(!level.isClientSide())
+                        ((ServerLevel) level).getChunkSource().blockChanged(worldPosition);
+        }
+        
+        public static void tick(Level level, BlockPos pos, BlockState state, NaquadahGeneratorEntity generator)
+        {
+                if(level.isClientSide())
+                        return;
+                
+                generator.doReaction();
+                
+                Direction direction = generator.getDirection();
+                if(direction != null)
+                {
+                        generator.outputEnergy(generator.getBottomDirection());
+                        generator.outputEnergy(direction.getClockWise());
+                        generator.outputEnergy(direction.getCounterClockWise());
+                }
+                
+                if(generator.clientDirty && level.getGameTime() % 10 == 0)
+                {
+                        generator.updateClient();
+                        generator.clientDirty = false;
+                }
+        }
 }

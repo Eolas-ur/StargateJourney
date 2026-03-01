@@ -1,5 +1,29 @@
 # Documentation Changelog
 
+## 2026-03-01 (Update 6)
+
+### Performance & Structural Hygiene Sprint (Phase 2)
+
+All Phase 2 findings documented and marked as fixed/improved in audit docs.
+
+**Code changes (from prior commits, now documented):**
+- **G010 (FIXED):** Dirty-flag-driven `updateClient()` across all tech BEs. `EnergyBlockEntity.clientDirty` covers generators, batteries, interfaces, crystallizers. Separate `clientDirty` in `AbstractNaquadahLiquidizerEntity` and `TransceiverEntity`. Throttled sync (every 10 ticks) for energy BEs; immediate for Transceiver.
+- **G008 (FIXED):** `max_transmission_scan_chunks` config (default 81, range 9–289) in `CommonTransmissionConfig`. All 4 scan loops in `GDOItem` and `TransceiverEntity` now break when exceeding limit.
+- **F004 (FIXED):** Early `isEmpty()` return in `StargateNetwork.handleConnections()` and `TransporterNetwork.handleConnections()`. Copy constructor instead of `putAll()`.
+- **P001 (IMPROVED):** `StargateNetwork.updateNetwork()` log upgraded to WARN with descriptive message.
+- **P002 (IMPROVED):** `TransporterNetwork.updateNetwork()` log upgraded to WARN with descriptive message.
+- **P003 (FIXED):** Aggregate malformed-UUID counting + WARN logging in `BlockEntityList.deserializeTransporters()`, `StargateNetwork.deserializeConnections()`, `TransporterNetwork.deserializeConnections()`. Try-catch added to `TransporterNetwork.Dimension.deserialize()` for previously unguarded `UUID.fromString()`.
+
+**Documentation updates:**
+- `Findings_Gameplay.md` — G008 and G010 marked FIXED with fix details
+- `Findings.md` — F004 marked FIXED with fix details
+- `Findings_Persistence.md` — P001/P002 marked IMPROVED, P003 marked FIXED
+- `Audit/README.md` — Top 10 table updated (9 of 10 now fixed/improved; only G012 remains open)
+
+**Build:** Successful. Only pre-existing deprecation warnings (10× `@EventBusSubscriber`).
+
+---
+
 ## 2026-03-01 (Update 5)
 
 ### Security Hardening: All High-Severity Findings Fixed

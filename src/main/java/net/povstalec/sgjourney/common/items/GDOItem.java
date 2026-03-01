@@ -27,180 +27,192 @@ import net.povstalec.sgjourney.common.sgjourney.ITransmissionReceiver;
 
 public class GDOItem extends Item
 {
-	public static final String IDC = "idc";
-	public static final String FREQUENCY = "frequency";
-	
-	public GDOItem(Properties properties)
-	{
-		super(properties);
-	}
-	
-	public static void sendTransmission(Level level, Player player, ItemStack stack)
-	{
-		int roundedRadius = (int) Math.ceil(transmissionRadius() / 16);
-		
-		for(int x = -roundedRadius; x <= roundedRadius; x++)
-		{
-			for(int z = -roundedRadius; z <= roundedRadius; z++)
-			{
-				ChunkAccess chunk = level.getChunk(player.getOnPos().east(16 * x).south(16 * z));
-				Set<BlockPos> positions = chunk.getBlockEntitiesPos();
-				
-				positions.stream().forEach(pos ->
-				{
-					BlockEntity blockEntity = level.getBlockEntity(pos);
-					
-					if(blockEntity instanceof ITransmissionReceiver receiver)
-						receiver.receiveTransmission(0, getFrequency(stack), getTransmissionMessage(stack));
-				});
-			}
-		}
-	}
-	
-	private static double distance2(BlockPos pos, BlockPos targetPos)
-	{
-		int x = Math.abs(targetPos.getX() - pos.getX());
-		int y = Math.abs(targetPos.getY() - pos.getY());
-		int z = Math.abs(targetPos.getZ() - pos.getZ());
-		
-		return x*x + y*y + z*z;
-	}
-	
-	private static void checkShieldingState(Level level, Player player)
-	{
-		int roundedRadius = (int) Math.ceil(transmissionRadius() / 16);
-		BlockPos playerPos = player.getOnPos().above();
-		
-		List<AbstractStargateEntity> stargates = new ArrayList<AbstractStargateEntity>();
-		
-		for(int x = -roundedRadius; x <= roundedRadius; x++)
-		{
-			for(int z = -roundedRadius; z <= roundedRadius; z++)
-			{
-				ChunkAccess chunk = level.getChunk(player.getOnPos().east(16 * x).south(16 * z));
-				Set<BlockPos> positions = chunk.getBlockEntitiesPos();
-				
-				positions.stream().forEach(pos ->
-				{
-					if(level.getBlockEntity(pos) instanceof AbstractStargateEntity stargate && distance2(playerPos, stargate.getBlockPos()) <= transmissionRadius2())
-					{
-						stargates.add(stargate);
-					}
-				});
-			}
-		}
-		
-		if(stargates.size() == 0)
-		{
-			player.displayClientMessage(Component.translatable("message.sgjourney.gdo.error.no_nearby_stargate").withStyle(ChatFormatting.RED), true);
-			return;
-		}
-		
-		stargates.sort((stargateA, stargateB) ->
-		Double.valueOf(distance2(playerPos, stargateA.getBlockPos()))
-		.compareTo(Double.valueOf(distance2(playerPos, stargateB.getBlockPos()))));
-		
-		AbstractStargateEntity stargate = stargates.get(0);
-		
-		if(!stargate.isConnected())
-		{
-			player.displayClientMessage(Component.translatable("message.sgjourney.gdo.error.stargate_not_connected").withStyle(ChatFormatting.RED), true);
-			return;
-		}
-		
-		int shieldingProgress = (int) Math.round(stargate.checkConnectionShieldingState());
-		
-		ChatFormatting formatting;
-		
-		if(shieldingProgress == 0)
-			formatting = ChatFormatting.DARK_GREEN;
-		else if(shieldingProgress < 10)
-			formatting = ChatFormatting.GREEN;
-		else if(shieldingProgress < 50)
-			formatting = ChatFormatting.YELLOW;
-		else if(shieldingProgress < 70)
-			formatting = ChatFormatting.GOLD;
-		else if(shieldingProgress < 90)
-			formatting = ChatFormatting.RED;
-		else
-			formatting = ChatFormatting.DARK_RED;
-		
-		player.displayClientMessage(Component.translatable("message.sgjourney.gdo.shielded").append(Component.literal(": " + shieldingProgress + "%")).withStyle(formatting), true);
-	}
-	
-	@Override
+        public static final String IDC = "idc";
+        public static final String FREQUENCY = "frequency";
+        
+        public GDOItem(Properties properties)
+        {
+                super(properties);
+        }
+        
+        public static void sendTransmission(Level level, Player player, ItemStack stack)
+        {
+                int roundedRadius = (int) Math.ceil(transmissionRadius() / 16);
+                int maxChunks = CommonTransmissionConfig.max_transmission_scan_chunks.get();
+                int chunksScanned = 0;
+                
+                for(int x = -roundedRadius; x <= roundedRadius; x++)
+                {
+                        for(int z = -roundedRadius; z <= roundedRadius; z++)
+                        {
+                                if(++chunksScanned > maxChunks)
+                                        break;
+                                ChunkAccess chunk = level.getChunk(player.getOnPos().east(16 * x).south(16 * z));
+                                Set<BlockPos> positions = chunk.getBlockEntitiesPos();
+                                
+                                positions.stream().forEach(pos ->
+                                {
+                                        BlockEntity blockEntity = level.getBlockEntity(pos);
+                                        
+                                        if(blockEntity instanceof ITransmissionReceiver receiver)
+                                                receiver.receiveTransmission(0, getFrequency(stack), getTransmissionMessage(stack));
+                                });
+                        }
+                        if(chunksScanned > maxChunks)
+                                break;
+                }
+        }
+        
+        private static double distance2(BlockPos pos, BlockPos targetPos)
+        {
+                int x = Math.abs(targetPos.getX() - pos.getX());
+                int y = Math.abs(targetPos.getY() - pos.getY());
+                int z = Math.abs(targetPos.getZ() - pos.getZ());
+                
+                return x*x + y*y + z*z;
+        }
+        
+        private static void checkShieldingState(Level level, Player player)
+        {
+                int roundedRadius = (int) Math.ceil(transmissionRadius() / 16);
+                int maxChunks = CommonTransmissionConfig.max_transmission_scan_chunks.get();
+                int chunksScanned = 0;
+                BlockPos playerPos = player.getOnPos().above();
+                
+                List<AbstractStargateEntity> stargates = new ArrayList<AbstractStargateEntity>();
+                
+                for(int x = -roundedRadius; x <= roundedRadius; x++)
+                {
+                        for(int z = -roundedRadius; z <= roundedRadius; z++)
+                        {
+                                if(++chunksScanned > maxChunks)
+                                        break;
+                                ChunkAccess chunk = level.getChunk(player.getOnPos().east(16 * x).south(16 * z));
+                                Set<BlockPos> positions = chunk.getBlockEntitiesPos();
+                                
+                                positions.stream().forEach(pos ->
+                                {
+                                        if(level.getBlockEntity(pos) instanceof AbstractStargateEntity stargate && distance2(playerPos, stargate.getBlockPos()) <= transmissionRadius2())
+                                        {
+                                                stargates.add(stargate);
+                                        }
+                                });
+                        }
+                        if(chunksScanned > maxChunks)
+                                break;
+                }
+                
+                if(stargates.size() == 0)
+                {
+                        player.displayClientMessage(Component.translatable("message.sgjourney.gdo.error.no_nearby_stargate").withStyle(ChatFormatting.RED), true);
+                        return;
+                }
+                
+                stargates.sort((stargateA, stargateB) ->
+                Double.valueOf(distance2(playerPos, stargateA.getBlockPos()))
+                .compareTo(Double.valueOf(distance2(playerPos, stargateB.getBlockPos()))));
+                
+                AbstractStargateEntity stargate = stargates.get(0);
+                
+                if(!stargate.isConnected())
+                {
+                        player.displayClientMessage(Component.translatable("message.sgjourney.gdo.error.stargate_not_connected").withStyle(ChatFormatting.RED), true);
+                        return;
+                }
+                
+                int shieldingProgress = (int) Math.round(stargate.checkConnectionShieldingState());
+                
+                ChatFormatting formatting;
+                
+                if(shieldingProgress == 0)
+                        formatting = ChatFormatting.DARK_GREEN;
+                else if(shieldingProgress < 10)
+                        formatting = ChatFormatting.GREEN;
+                else if(shieldingProgress < 50)
+                        formatting = ChatFormatting.YELLOW;
+                else if(shieldingProgress < 70)
+                        formatting = ChatFormatting.GOLD;
+                else if(shieldingProgress < 90)
+                        formatting = ChatFormatting.RED;
+                else
+                        formatting = ChatFormatting.DARK_RED;
+                
+                player.displayClientMessage(Component.translatable("message.sgjourney.gdo.shielded").append(Component.literal(": " + shieldingProgress + "%")).withStyle(formatting), true);
+        }
+        
+        @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand)
-	{
-		if(level.isClientSide())
-			return super.use(level, player, usedHand);
+        {
+                if(level.isClientSide())
+                        return super.use(level, player, usedHand);
 
-		ItemStack stack = player.getItemInHand(usedHand);
-		
-		// Open the GDO screen / Send IDC transmission
-		if(player.isShiftKeyDown())
-		{
-			PacketDistributor.sendToPlayer((ServerPlayer) player, new ClientboundGDOOpenScreenPacket(player.getUUID(), usedHand == InteractionHand.MAIN_HAND, getTransmissionMessage(stack), getFrequency(stack)));
-			
-	        return super.use(level, player, usedHand);
-		}
-		// Check Iris / Shield state
-		else
-		{
-			checkShieldingState(level, player);
-			
-			return InteractionResultHolder.success(stack);
-		}
+                ItemStack stack = player.getItemInHand(usedHand);
+                
+                // Open the GDO screen / Send IDC transmission
+                if(player.isShiftKeyDown())
+                {
+                        PacketDistributor.sendToPlayer((ServerPlayer) player, new ClientboundGDOOpenScreenPacket(player.getUUID(), usedHand == InteractionHand.MAIN_HAND, getTransmissionMessage(stack), getFrequency(stack)));
+                        
+                return super.use(level, player, usedHand);
+                }
+                // Check Iris / Shield state
+                else
+                {
+                        checkShieldingState(level, player);
+                        
+                        return InteractionResultHolder.success(stack);
+                }
     }
-	
-	@Override
-	public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag)
-	{
-		int frequency = getFrequency(stack);
-		String idc = getTransmissionMessage(stack);
+        
+        @Override
+        public void appendHoverText(ItemStack stack, TooltipContext context, List<Component> tooltipComponents, TooltipFlag tooltipFlag)
+        {
+                int frequency = getFrequency(stack);
+                String idc = getTransmissionMessage(stack);
 
-		tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.frequency").append(Component.literal(": " + frequency)).withStyle(ChatFormatting.YELLOW));
-		tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.idc").append(Component.literal(": " + idc)).withStyle(ChatFormatting.AQUA));
-		
-		tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.description.check").withStyle(ChatFormatting.GRAY).withStyle(ChatFormatting.ITALIC));
-		tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.description.gui").withStyle(ChatFormatting.GRAY).withStyle(ChatFormatting.ITALIC));
-		
-		super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
-	}
-	
-	public static float transmissionRadius()
-	{
-		return CommonTransmissionConfig.max_gdo_transmission_distance.get();
-	}
-	
-	public static float transmissionRadius2()
-	{
-		return transmissionRadius() * transmissionRadius();
-	}
-	
+                tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.frequency").append(Component.literal(": " + frequency)).withStyle(ChatFormatting.YELLOW));
+                tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.idc").append(Component.literal(": " + idc)).withStyle(ChatFormatting.AQUA));
+                
+                tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.description.check").withStyle(ChatFormatting.GRAY).withStyle(ChatFormatting.ITALIC));
+                tooltipComponents.add(Component.translatable("tooltip.sgjourney.gdo.description.gui").withStyle(ChatFormatting.GRAY).withStyle(ChatFormatting.ITALIC));
+                
+                super.appendHoverText(stack, context, tooltipComponents, tooltipFlag);
+        }
+        
+        public static float transmissionRadius()
+        {
+                return CommonTransmissionConfig.max_gdo_transmission_distance.get();
+        }
+        
+        public static float transmissionRadius2()
+        {
+                return transmissionRadius() * transmissionRadius();
+        }
+        
 
-	
-	public static String getTransmissionMessage(ItemStack stack)
-	{
-		if(stack.getItem() instanceof GDOItem)
-			return stack.getOrDefault(DataComponentInit.IDC, "");
-		
-		return "";
-	}
-	
-	public static int getFrequency(ItemStack stack)
-	{
-		if(stack.getItem() instanceof GDOItem)
-			return stack.getOrDefault(DataComponentInit.FREQUENCY, 0);
-		
-		return 0;
-	}
-	
-	public static void setFrequencyAndIDC(ItemStack stack, int frequency, String idc)
-	{
-		if(stack.getItem() instanceof GDOItem)
-		{
-			stack.set(DataComponentInit.FREQUENCY, frequency);
-			stack.set(DataComponentInit.IDC, idc);
-		}
-	}
+        
+        public static String getTransmissionMessage(ItemStack stack)
+        {
+                if(stack.getItem() instanceof GDOItem)
+                        return stack.getOrDefault(DataComponentInit.IDC, "");
+                
+                return "";
+        }
+        
+        public static int getFrequency(ItemStack stack)
+        {
+                if(stack.getItem() instanceof GDOItem)
+                        return stack.getOrDefault(DataComponentInit.FREQUENCY, 0);
+                
+                return 0;
+        }
+        
+        public static void setFrequencyAndIDC(ItemStack stack, int frequency, String idc)
+        {
+                if(stack.getItem() instanceof GDOItem)
+                {
+                        stack.set(DataComponentInit.FREQUENCY, frequency);
+                        stack.set(DataComponentInit.IDC, idc);
+                }
+        }
 }

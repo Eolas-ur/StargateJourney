@@ -4,48 +4,40 @@ Global audit of all SavedData classes, NBT stores, and serialization paths.
 
 ---
 
-## P001: StargateNetwork Version Migration Is Destructive
+## P001: StargateNetwork Version Migration Is Destructive — IMPROVED
 
 - **Severity:** Medium
+- **Status:** Improved (warning log added; migration behavior unchanged)
 - **Affected:** `StargateNetwork` — `sgjourney-stargate_network`
-- **Impact:** When `version` in the saved data is less than `updateVersion` (currently 17), `deserialize()` skips loading connections entirely and increments the version. This means all active stargate connections are silently dropped on version upgrade. While this prevents crashes from format changes, it provides no migration path — any connection active at the time of the upgrade is permanently lost.
-- **Evidence:** `StargateNetwork.deserialize()` — checks `version < updateVersion` and skips `deserializeConnections()`.
-- **Repro:**
-  1. Establish a stargate connection.
-  2. Save the world.
-  3. Manually set `version` to a lower value in `sgjourney-stargate_network.dat`.
-  4. Reload.
-  5. Observe: all connections are gone.
-- **Suggested Fix:** Log a warning when connections are dropped due to version migration. Consider serializing connections in a format that degrades gracefully across versions.
-- **Verify:** Check server log for migration warning.
+- **Impact:** When `version` in the saved data differs from `updateVersion` (currently 17), `updateNetwork()` calls `stellarUpdate()` which terminates all connections, erases universe data, and re-registers stargates. Previously logged at DEBUG level with no description of consequences.
+- **Fix Applied:** Changed `StargateNetwork.updateNetwork()` log from `LOGGER.debug` to `LOGGER.warn` with explicit message: `"Stargate Network version migration: {} -> {}. All active connections will be terminated, universe data regenerated, and stargates re-registered."` Includes old and new version numbers.
+- **Verify:** Set `version` to a lower value in `sgjourney-stargate_network.dat`. On reload, server log shows WARN-level message with version numbers and description of what will be reset.
 
 ---
 
-## P002: TransporterNetwork Version Migration Same Pattern
+## P002: TransporterNetwork Version Migration Same Pattern — IMPROVED
 
 - **Severity:** Medium
+- **Status:** Improved (warning log added; migration behavior unchanged)
 - **Affected:** `TransporterNetwork` — `sgjourney-transporter_network`
-- **Impact:** Same destructive migration pattern as P001. When `version < UPDATE_VERSION` (currently 2), all transporter connections and dimension data are dropped.
-- **Evidence:** `TransporterNetwork.deserialize()` — checks version and skips deserialization.
-- **Repro:** Same as P001 but for transporter network.
-- **Suggested Fix:** Same as P001.
-- **Verify:** Same as P001.
+- **Impact:** Same destructive migration pattern as P001. When version differs from `UPDATE_VERSION` (currently 2), all transporter connections and dimension data are cleared.
+- **Fix Applied:** Changed `TransporterNetwork.updateNetwork()` log from `LOGGER.info` to `LOGGER.warn` with explicit message: `"Transporter Network version migration: {} -> {}. All transporter connections and dimension mappings will be cleared and re-registered."` Includes old and new version numbers.
+- **Verify:** Same as P001 but for transporter network data.
 
 ---
 
-## P003: BlockEntityList UUID Parse Failure Creates Orphaned Entries
+## P003: BlockEntityList UUID Parse Failure Creates Orphaned Entries — FIXED
 
 - **Severity:** Medium
-- **Affected:** `BlockEntityList` — `sgjourney-block_entities`
-- **Impact:** In `tryDeserializeTransporter()`, if a UUID string fails to parse (`IllegalArgumentException`), a new UUID is generated and the transporter is stored under the new key. The old malformed key remains in the `CompoundTag` source. On save, both the old (unparseable) and new entries exist. Over multiple load/save cycles with data corruption, orphaned entries accumulate.
-- **Evidence:** `BlockEntityList.tryDeserializeTransporter()` — catches parse exception, generates new UUID, does not remove old key.
-- **Repro:**
-  1. Edit `sgjourney-block_entities.dat` to insert a transporter with a malformed UUID key.
-  2. Reload the server.
-  3. Save and reload again.
-  4. Inspect the dat file — both the malformed key and the new valid UUID entry exist.
-- **Suggested Fix:** On UUID parse failure, log a warning with the malformed key. After deserialization, remove keys that failed to parse from the source `CompoundTag` before re-serializing.
-- **Verify:** After reload, only valid UUID entries exist in the saved data.
+- **Status:** Fixed
+- **Affected:** `BlockEntityList` — `sgjourney-block_entities`, `StargateNetwork`, `TransporterNetwork`
+- **Impact:** Malformed UUID keys in saved data could silently accumulate. Additionally, `TransporterNetwork.Dimension.deserialize()` had an unguarded `UUID.fromString()` that could crash the entire TransporterNetwork load.
+- **Fix Applied:**
+  - **`BlockEntityList.deserializeTransporters()`**: Added aggregate counting of recovered (malformed UUID, new UUID assigned) and skipped (unrecoverable) entries. Logs WARN with counts after deserialization. Orphaned entries do not persist because `serialize()` writes from the in-memory `transporterMap` (not the source CompoundTag).
+  - **`StargateNetwork.deserializeConnections()`**: Added aggregate malformed UUID counter and WARN log (previously silently swallowed `IllegalArgumentException`).
+  - **`TransporterNetwork.deserializeConnections()`**: Changed per-entry `LOGGER.error` to aggregate counter with single WARN line, reducing log spam.
+  - **`TransporterNetwork.Dimension.deserialize()`**: Added `try-catch` around `UUID.fromString(transporterID)` — previously unguarded, could crash entire TransporterNetwork load. Logs aggregate WARN with dimension name.
+- **Verify:** Insert malformed UUID key in `sgjourney-block_entities.dat`. Reload — no crash, WARN log shows count. Save and reload — malformed key does not persist.
 
 ---
 

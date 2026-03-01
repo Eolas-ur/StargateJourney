@@ -34,7 +34,7 @@ Severity follows the rubric in `Rubric.md`:
 |------|----------|
 | `Inventory.md` | Complete registry of all blocks, items, BEs, menus, packets, SavedData |
 | `Rubric.md` | Consistent checks applied to every object |
-| `Findings.md` | Original targeted findings (F001–F009), F001 and F002 fixed |
+| `Findings.md` | Original targeted findings (F001–F009), F001/F002/F004 fixed |
 | `Findings_Gameplay.md` | Full gameplay audit (G001–G015) |
 | `Findings_Packets.md` | Global packet audit with validation matrix |
 | `Findings_Persistence.md` | NBT/SavedData audit (P001–P007) |
@@ -48,12 +48,12 @@ Severity follows the rubric in `Rubric.md`:
 | 2 | G002 | Distance check on Interface packet | High | **FIXED** |
 | 3 | G003 | Distance check on Transceiver packet | High | **FIXED** |
 | 4 | G004 | Defensive chunk unforce on stargate destruction | High | **FIXED** |
-| 5 | G010 | Dirty-flag `updateClient()` in tech BEs | Medium | Open |
-| 6 | P001 | Log warning on StargateNetwork version migration | Medium | Open |
-| 7 | P003 | Clean orphaned UUID entries in BlockEntityList | Medium | Open |
-| 8 | G008 | Cap GDO/Transceiver transmission scan radius | Medium | Open |
+| 5 | G010 | Dirty-flag `updateClient()` in tech BEs | Medium | **FIXED** |
+| 6 | P001 | Log warning on StargateNetwork version migration | Medium | **IMPROVED** |
+| 7 | P003 | Clean orphaned UUID entries in BlockEntityList | Medium | **FIXED** |
+| 8 | G008 | Cap GDO/Transceiver transmission scan radius | Medium | **FIXED** |
 | 9 | G012 | Defer cable BFS to end-of-tick | Medium | Open |
-| 10 | F004 | Guard `handleConnections()` with `isEmpty()` | Medium | Open |
+| 10 | F004 | Guard `handleConnections()` with `isEmpty()` | Medium | **FIXED** |
 
 ## Statistics
 
