@@ -66,3 +66,15 @@ Memory Crystals store a `UUID` reference. If the target transporter is destroyed
 There is no particle effect, sound, or UI indicator showing whether a Ring Panel is within 16 blocks of a Transport Ring platform. A misplaced panel silently fails.
 
 **Inference:** `setTransportRings()` returns `null` if no ring is found within range, and `activateRings()` silently returns if `transportRings == null` (line 200: `//TODO Tell the player there are no rings connected`). The TODO comment confirms this is a known gap.
+
+---
+
+## What Privacy Mode Does NOT Solve
+
+The `discoverable` flag (see `docs/Rings/Discovery_and_Network.md`) hides endpoints from the Ring Panel's auto-discovery list. However:
+
+1. **No per-player access control.** Privacy is global — all players see the same endpoint visibility. There is no ownership, whitelist, or permission system.
+2. **Memory Crystal bypass.** Any player holding a Memory Crystal bound to a private endpoint can still transport to it. Privacy only affects auto-discovery, not direct UUID-based targeting.
+3. **No visual block indicator.** There is no blockstate, texture, or particle change on private rings. Players must use PDA status output or try toggling to determine the current state.
+4. **No command integration.** There are no server commands to list private endpoints, bulk-toggle privacy, or query privacy state remotely.
+5. **UUID remains accessible.** A player who knows (or has recorded) the UUID of a private endpoint can bind a Memory Crystal to it and transport freely.

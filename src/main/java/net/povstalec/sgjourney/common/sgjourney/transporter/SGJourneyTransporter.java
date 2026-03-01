@@ -25,264 +25,279 @@ import net.povstalec.sgjourney.common.sgjourney.Transporting;
 
 public class SGJourneyTransporter implements Transporter
 {
-	public static final Vec3 FORWARD = new Vec3(1, 0, 0);
-	public static final Vec3 UP = new Vec3(0, 1, 0);
-	public static final Vec3 RIGHT = new Vec3(0, 0, 1);
-	public static final double INNER_RADIUS = 2;
-	
-	private UUID id;
-	private ResourceKey<Level> dimension;
-	private BlockPos blockPos;
-	
-	@Nullable
-	private Component name;
-	
-	public SGJourneyTransporter() {}
-	
-	public SGJourneyTransporter(UUID id, ResourceKey<Level> dimension, BlockPos blockPos, Component name)
-	{
-		this.id = id;
-		this.dimension = dimension;
-		this.blockPos = blockPos;
-		
-		this.name = name;
-	}
-	
-	public SGJourneyTransporter(AbstractTransporterEntity transporterEntity)
-	{
-		this(transporterEntity.getID(), transporterEntity.getLevel().dimension(), transporterEntity.getBlockPos(), transporterEntity.getCustomName());
-	}
-	
-	@Override
-	public UUID getID()
-	{
-		return id;
-	}
-	
-	@Override
-	public ResourceKey<Level> getDimension()
-	{
-		return dimension;
-	}
-	
-	public BlockPos getBlockPos()
-	{
-		return blockPos;
-	}
-	
-	@Override
-	public @Nullable Vec3 getPosition(MinecraftServer server)
-	{
-		return getBlockPos().getCenter();
-	}
-	
-	@Override
-	public @Nullable Vec3 getForward(MinecraftServer server)
-	{
-		return FORWARD;
-	}
-	
-	@Override
-	public @Nullable Vec3 getUp(MinecraftServer server)
-	{
-		return UP;
-	}
-	
-	@Override
-	public @Nullable Vec3 getRight(MinecraftServer server)
-	{
-		return RIGHT;
-	}
-	
-	@Override
-	public double getInnerRadius()
-	{
-		return INNER_RADIUS;
-	}
-	
-	@Override
-	@Nullable
-	public Vec3 transportPos(MinecraftServer server)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			return transporter.transportPos().getCenter();
-		
-		return null;
-	}
-	
-	@Override
-	public Component getName()
-	{
-		return name != null ? name : Component.empty();
-	}
-	
-	@Nullable
-	public AbstractTransporterEntity getTransporterEntity(MinecraftServer server)
-	{
-		ServerLevel level = server.getLevel(dimension);
-		
-		if(level != null && level.getBlockEntity(blockPos) instanceof AbstractTransporterEntity transporter)
-			return transporter;
-		
-		return null;
-	}
-	
-	@Override
-	public int getTimeOffset(MinecraftServer server)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			return transporter.getTimeOffset();
-		
-		return 0;
-	}
-	
-	@Override
-	public List<Entity> entitiesToTransport(MinecraftServer server)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			return transporter.entitiesToTransport();
-		
-		return ImmutableList.of();
-	}
-	
-	@Override
-	public void transportTravelers(MinecraftServer server, TransporterConnection connection, Transporter receivingTransporter, List<Entity> travelers)
-	{
-		transporterRun(server, transporter ->
-		{
-			Transporting.transportTravelers(server, connection, this, receivingTransporter, travelers);
-		});
-		
-	}
-	
-	@Override
-	public boolean receiveTraveler(MinecraftServer server, TransporterConnection connection, Transporter sendingTransporter, Entity traveler, Vec3 relativePosition, Vec3 relativeMomentum, Vec3 relativeLookAngle)
-	{
-		Vec3 destinationPosition = fromTransporterCoords(server, relativePosition, true).add(transportPos(server));
-		Vec3 destinationMomentum = fromTransporterCoords(server, relativeMomentum, false);
-		Vec3 destinationLookAngle = fromTransporterCoords(server, relativeLookAngle, false);
-		
-		return Transporting.receiveTraveler(getLevel(server), this, traveler, destinationPosition, destinationMomentum, destinationLookAngle);
-	}
-	
-	@Override
-	public void connect(MinecraftServer server, UUID connectionID)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			transporter.connectTransporter(connectionID);
-	}
-	
-	@Override
-	public void disconnect(MinecraftServer server)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			transporter.disconnectTransporter();
-	}
-	
-	@Override
-	public void reset(MinecraftServer server)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			transporter.resetTransporter();
-	}
-	
-	@Override
-	public boolean isConnected(MinecraftServer server)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			return transporter.isConnected();
-		
-		return false;
-	}
-	
-	@Override
-	public void updateTicks(MinecraftServer server, int connectionTime)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			transporter.updateTicks(connectionTime);
-	}
-	
-	
-	
-	@Override
-	public String toString()
-	{
-		String nameString = name != null ? name.getString() : id.toString();
-		
-		return "[ " + nameString + " | Pos: " + blockPos.toString() + " ]";
-	}
-	
-	
-	@Override
-	public CompoundTag serializeNBT(HolderLookup.Provider registries)
-	{
-		CompoundTag transporterTag = new CompoundTag();
-		ResourceKey<Level> level = this.getDimension();
-		BlockPos pos = this.getBlockPos();
-		
-		transporterTag.putString(DIMENSION, level.location().toString());
-		transporterTag.putIntArray(COORDINATES, new int[] {pos.getX(), pos.getY(), pos.getZ()});
-		
-		if(this.name != null)
-			transporterTag.putString(CUSTOM_NAME, Component.Serializer.toJson(this.name, registries));
-		
-		return transporterTag;
-	}
-	
-	public void deserializeNBT(MinecraftServer server, UUID uuid, CompoundTag tag, HolderLookup.Provider registries)
-	{
-		this.dimension = Conversion.stringToDimension(tag.getString(DIMENSION));
-		this.blockPos = Conversion.intArrayToBlockPos(tag.getIntArray(COORDINATES));
-		
-		if(tag.contains(CUSTOM_NAME, CompoundTag.OBJECT_HEADER))
-			this.name = Component.Serializer.fromJson(tag.getString(CUSTOM_NAME), registries);
-		
-		this.id = uuid;
-	}
-	
-	
-	
-	public interface TransporterConsumer
-	{
-		void run(AbstractTransporterEntity transporter);
-	}
-	
-	public interface ReturnTransporterConsumer<T>
-	{
-		T run(AbstractTransporterEntity transporter);
-	}
-	
-	private void transporterRun(MinecraftServer server, TransporterConsumer consumer)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			consumer.run(transporter);
-	}
-	
-	private <T> T transporterReturn(MinecraftServer server, ReturnTransporterConsumer<T> consumer, @Nullable T defaultValue)
-	{
-		AbstractTransporterEntity transporter = getTransporterEntity(server);
-		
-		if(transporter != null)
-			return consumer.run(transporter);
-		
-		return defaultValue;
-	}
+        public static final Vec3 FORWARD = new Vec3(1, 0, 0);
+        public static final Vec3 UP = new Vec3(0, 1, 0);
+        public static final Vec3 RIGHT = new Vec3(0, 0, 1);
+        public static final double INNER_RADIUS = 2;
+        
+        public static final String DISCOVERABLE_TAG = "Discoverable";
+        
+        private UUID id;
+        private ResourceKey<Level> dimension;
+        private BlockPos blockPos;
+        
+        @Nullable
+        private Component name;
+        
+        private boolean discoverable = true;
+        
+        public SGJourneyTransporter() {}
+        
+        public SGJourneyTransporter(UUID id, ResourceKey<Level> dimension, BlockPos blockPos, Component name, boolean discoverable)
+        {
+                this.id = id;
+                this.dimension = dimension;
+                this.blockPos = blockPos;
+                this.name = name;
+                this.discoverable = discoverable;
+        }
+        
+        public SGJourneyTransporter(AbstractTransporterEntity transporterEntity)
+        {
+                this(transporterEntity.getID(), transporterEntity.getLevel().dimension(), transporterEntity.getBlockPos(), transporterEntity.getCustomName(), transporterEntity.isDiscoverable());
+        }
+        
+        @Override
+        public UUID getID()
+        {
+                return id;
+        }
+        
+        @Override
+        public ResourceKey<Level> getDimension()
+        {
+                return dimension;
+        }
+        
+        public BlockPos getBlockPos()
+        {
+                return blockPos;
+        }
+        
+        @Override
+        public @Nullable Vec3 getPosition(MinecraftServer server)
+        {
+                return getBlockPos().getCenter();
+        }
+        
+        @Override
+        public @Nullable Vec3 getForward(MinecraftServer server)
+        {
+                return FORWARD;
+        }
+        
+        @Override
+        public @Nullable Vec3 getUp(MinecraftServer server)
+        {
+                return UP;
+        }
+        
+        @Override
+        public @Nullable Vec3 getRight(MinecraftServer server)
+        {
+                return RIGHT;
+        }
+        
+        @Override
+        public double getInnerRadius()
+        {
+                return INNER_RADIUS;
+        }
+        
+        @Override
+        @Nullable
+        public Vec3 transportPos(MinecraftServer server)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        return transporter.transportPos().getCenter();
+                
+                return null;
+        }
+        
+        @Override
+        public Component getName()
+        {
+                return name != null ? name : Component.empty();
+        }
+        
+        @Override
+        public boolean isDiscoverable()
+        {
+                return discoverable;
+        }
+        
+        @Nullable
+        public AbstractTransporterEntity getTransporterEntity(MinecraftServer server)
+        {
+                ServerLevel level = server.getLevel(dimension);
+                
+                if(level != null && level.getBlockEntity(blockPos) instanceof AbstractTransporterEntity transporter)
+                        return transporter;
+                
+                return null;
+        }
+        
+        @Override
+        public int getTimeOffset(MinecraftServer server)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        return transporter.getTimeOffset();
+                
+                return 0;
+        }
+        
+        @Override
+        public List<Entity> entitiesToTransport(MinecraftServer server)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        return transporter.entitiesToTransport();
+                
+                return ImmutableList.of();
+        }
+        
+        @Override
+        public void transportTravelers(MinecraftServer server, TransporterConnection connection, Transporter receivingTransporter, List<Entity> travelers)
+        {
+                transporterRun(server, transporter ->
+                {
+                        Transporting.transportTravelers(server, connection, this, receivingTransporter, travelers);
+                });
+                
+        }
+        
+        @Override
+        public boolean receiveTraveler(MinecraftServer server, TransporterConnection connection, Transporter sendingTransporter, Entity traveler, Vec3 relativePosition, Vec3 relativeMomentum, Vec3 relativeLookAngle)
+        {
+                Vec3 destinationPosition = fromTransporterCoords(server, relativePosition, true).add(transportPos(server));
+                Vec3 destinationMomentum = fromTransporterCoords(server, relativeMomentum, false);
+                Vec3 destinationLookAngle = fromTransporterCoords(server, relativeLookAngle, false);
+                
+                return Transporting.receiveTraveler(getLevel(server), this, traveler, destinationPosition, destinationMomentum, destinationLookAngle);
+        }
+        
+        @Override
+        public void connect(MinecraftServer server, UUID connectionID)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        transporter.connectTransporter(connectionID);
+        }
+        
+        @Override
+        public void disconnect(MinecraftServer server)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        transporter.disconnectTransporter();
+        }
+        
+        @Override
+        public void reset(MinecraftServer server)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        transporter.resetTransporter();
+        }
+        
+        @Override
+        public boolean isConnected(MinecraftServer server)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        return transporter.isConnected();
+                
+                return false;
+        }
+        
+        @Override
+        public void updateTicks(MinecraftServer server, int connectionTime)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        transporter.updateTicks(connectionTime);
+        }
+        
+        
+        
+        @Override
+        public String toString()
+        {
+                String nameString = name != null ? name.getString() : id.toString();
+                
+                return "[ " + nameString + " | Pos: " + blockPos.toString() + " ]";
+        }
+        
+        
+        @Override
+        public CompoundTag serializeNBT(HolderLookup.Provider registries)
+        {
+                CompoundTag transporterTag = new CompoundTag();
+                ResourceKey<Level> level = this.getDimension();
+                BlockPos pos = this.getBlockPos();
+                
+                transporterTag.putString(DIMENSION, level.location().toString());
+                transporterTag.putIntArray(COORDINATES, new int[] {pos.getX(), pos.getY(), pos.getZ()});
+                
+                if(this.name != null)
+                        transporterTag.putString(CUSTOM_NAME, Component.Serializer.toJson(this.name, registries));
+                
+                transporterTag.putBoolean(DISCOVERABLE_TAG, this.discoverable);
+                
+                return transporterTag;
+        }
+        
+        public void deserializeNBT(MinecraftServer server, UUID uuid, CompoundTag tag, HolderLookup.Provider registries)
+        {
+                this.dimension = Conversion.stringToDimension(tag.getString(DIMENSION));
+                this.blockPos = Conversion.intArrayToBlockPos(tag.getIntArray(COORDINATES));
+                
+                if(tag.contains(CUSTOM_NAME, CompoundTag.OBJECT_HEADER))
+                        this.name = Component.Serializer.fromJson(tag.getString(CUSTOM_NAME), registries);
+                
+                if(tag.contains(DISCOVERABLE_TAG))
+                        this.discoverable = tag.getBoolean(DISCOVERABLE_TAG);
+                
+                this.id = uuid;
+        }
+        
+        
+        
+        public interface TransporterConsumer
+        {
+                void run(AbstractTransporterEntity transporter);
+        }
+        
+        public interface ReturnTransporterConsumer<T>
+        {
+                T run(AbstractTransporterEntity transporter);
+        }
+        
+        private void transporterRun(MinecraftServer server, TransporterConsumer consumer)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        consumer.run(transporter);
+        }
+        
+        private <T> T transporterReturn(MinecraftServer server, ReturnTransporterConsumer<T> consumer, @Nullable T defaultValue)
+        {
+                AbstractTransporterEntity transporter = getTransporterEntity(server);
+                
+                if(transporter != null)
+                        return consumer.run(transporter);
+                
+                return defaultValue;
+        }
 }

@@ -13,11 +13,15 @@ docs/
 │   ├── Addressing_and_Network.md      ← Address generation, NBT, network registry
 │   ├── Discovery_and_Maps.md          ← Archeologist trades, map mechanics
 │   └── Terra_Design_Notes.md          ← Terra gate analysis + proposals
-└── Rings/
-    ├── Overview.md                    ← Block/entity classes, network registry
-    ├── UI_and_Inventory.md            ← GUI, slots, memory crystals
-    ├── Discovery_and_Network.md       ← How rings find each other
-    └── Limitations_and_Gaps.md        ← Known UX issues
+├── Rings/
+│   ├── Overview.md                    ← Block/entity classes, network registry
+│   ├── UI_and_Inventory.md            ← GUI, slots, memory crystals
+│   ├── Discovery_and_Network.md       ← How rings find each other + privacy mode
+│   └── Limitations_and_Gaps.md        ← Known UX issues + privacy limitations
+└── Audit/
+    ├── README.md                      ← Audit methodology
+    ├── Findings.md                    ← Prioritised findings (F001–F009)
+    └── Test_Plan.md                   ← Manual reproduction steps
 ```
 
 ## Methodology

@@ -95,3 +95,79 @@ protected void loadChunk(boolean load) {
 
 - `ringsPos` and `ringsName` arrays on `RingPanelEntity` are **transient** — refreshed from the registry on demand.
 - Memory Crystal contents in slots are persisted via the standard inventory NBT of the block entity.
+
+---
+
+## Privacy Mode (discoverable flag)
+
+### Overview
+
+Each Transport Ring endpoint has a `discoverable` boolean flag that controls whether it appears in Ring Panel auto-discovery lists. When set to `false` (private), the endpoint is hidden from all nearby panels but remains accessible via Memory Crystal (UUID binding).
+
+### Where the Flag Lives
+
+- **Block Entity field:** `AbstractTransporterEntity.discoverable` (default: `true`)
+  - File: `src/main/java/net/povstalec/sgjourney/common/block_entities/transporter/AbstractTransporterEntity.java`
+  - NBT key: `"discoverable"` — persisted in `saveAdditional()` / `loadAdditional()`
+- **Data object field:** `SGJourneyTransporter.discoverable` (default: `true`)
+  - File: `src/main/java/net/povstalec/sgjourney/common/sgjourney/transporter/SGJourneyTransporter.java`
+  - NBT key: `"Discoverable"` — persisted in `serializeNBT()` / `deserializeNBT()`
+  - Propagated from block entity via constructor: `SGJourneyTransporter(AbstractTransporterEntity)`
+- **Interface method:** `Transporter.isDiscoverable()` (returns `boolean`)
+  - File: `src/main/java/net/povstalec/sgjourney/common/sgjourney/transporter/Transporter.java`
+
+### Default Behaviour
+
+All existing and new Transport Rings default to `discoverable = true`. This is fully backwards compatible — no existing world data is affected. The NBT load uses a conditional check: if the `"discoverable"` key is absent (old data), the field remains `true`.
+
+### How It Affects Panel Listing
+
+The filtering occurs **server-side** in `LocatorHelper.findNearestTransporters()`:
+
+**File:** `src/main/java/net/povstalec/sgjourney/common/misc/LocatorHelper.java` (line 70)
+
+The `removeIf` predicate now includes:
+```java
+if(!transporter.isDiscoverable())
+    return true;
+```
+
+This removes non-discoverable endpoints from the list **before** it is sorted, truncated to 6, and sent to the client. The client never sees private endpoints in the Ring Panel GUI.
+
+### How Memory Crystals Bypass Listing
+
+In `RingPanelEntity.activateRings()` (line 198), when a Memory Crystal is present in the selected slot, the code takes a separate path:
+
+```java
+if(stack.getItem() instanceof MemoryCrystalItem) {
+    UUID uuid = MemoryCrystalItem.getFirstUUID(stack);
+    Transporting.startTransport(level.getServer(), transportRings.getTransporter(), uuid);
+}
+```
+
+This path uses the UUID directly from the crystal. It does **not** consult `LocatorHelper` or the `ringsPos` list. The `discoverable` flag is never checked in this path. Therefore, Memory Crystal transport works regardless of the destination's privacy setting.
+
+### How to Toggle in Survival
+
+**Interaction:** Shift + right-click the Transport Rings block with an empty main hand.
+
+**File:** `src/main/java/net/povstalec/sgjourney/common/blocks/transporter/TransportRingsBlock.java` — `useWithoutItem()` override.
+
+Requirements:
+- Player must be **sneaking** (Shift key held)
+- Player's **main hand must be empty** (no item held)
+- Both conditions prevent accidental toggling
+
+Feedback:
+- `"Transport Rings set to: Discoverable"` (green text) — when toggled ON
+- `"Transport Rings set to: Private"` (red text) — when toggled OFF
+
+The toggle is **server-authoritative** — the `useWithoutItem` override checks `!level.isClientSide()` before modifying state.
+
+When toggled, `setDiscoverable()` re-registers the transporter with the network (remove + add) to ensure the cached `SGJourneyTransporter` data object in `TransporterNetwork` and `BlockEntityList` reflects the updated state immediately. This avoids stale visibility in the discovery filter.
+
+### Limitations
+
+- Privacy mode only hides from Ring Panel auto-discovery. It does **not** prevent transport via Memory Crystal or programmatic UUID targeting.
+- The flag is per-endpoint, not per-player. All players see the same visibility.
+- There is no visual indicator on the ring block itself showing whether it is private (no blockstate change, no particle effect). The status can be checked via PDA (`getStatus()` now reports "Discoverable: true/false").
